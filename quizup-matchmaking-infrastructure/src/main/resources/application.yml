@@ -1,0 +1,28 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: quizup-matchmaking
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/quizup_matchmaking
+    username: postgres
+    password: postgres
+
+  flyway:
+    locations: classpath:db/migration/matchmaking
+
+axon:
+  distributed:
+    enabled: true
+
+microservice:
+  swagger:
+    description: QuizUp Matchmaking Module - Lobby-based player matching
+  websocket:
+    enabled: true
+
+logging:
+  level:
+    io.github.quizup: DEBUG
