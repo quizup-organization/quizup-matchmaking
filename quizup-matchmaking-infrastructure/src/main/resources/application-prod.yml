@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: jdbc:postgresql://${QUIZUP_DB_HOST:postgres}:${QUIZUP_DB_PORT:5432}/${QUIZUP_DB_NAME:quizup_matchmaking}
+    username: ${QUIZUP_DB_USERNAME}
+    password: ${QUIZUP_DB_PASSWORD}
+
+  rabbitmq:
+    host: ${QUIZUP_RABBITMQ_HOST:rabbitmq}
+    port: ${QUIZUP_RABBITMQ_PORT:5672}
+    username: ${QUIZUP_RABBITMQ_USERNAME}
+    password: ${QUIZUP_RABBITMQ_PASSWORD}
+    virtual-host: ${QUIZUP_RABBITMQ_VHOST:/}
+
+microservice:
+  resource-server:
+    jwt:
+      issuer-uri: ${QUIZUP_AUTH_SERVER_URL:http://identity.quizup-prod.svc.cluster.local:8080}
+      jwk-set-uri: ${QUIZUP_AUTH_SERVER_JWKS_URL:http://identity.quizup-prod.svc.cluster.local:8080/oauth2/jwks}
+  swagger:
+    oauth2:
+      authorization-server-url: ${QUIZUP_AUTH_SERVER_URL:http://identity.quizup-prod.svc.cluster.local:8080}
+
+logging:
+  level:
+    io.github.quizup: INFO
+

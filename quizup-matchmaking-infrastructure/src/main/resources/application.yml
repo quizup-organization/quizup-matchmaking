@@ -1,14 +1,8 @@
-server:
-  port: 8090
-
 spring:
   application:
     name: quizup-matchmaking
-
-  datasource:
-    url: jdbc:postgresql://localhost:5432/quizup_matchmaking
-    username: postgres
-    password: postgres
+  profiles:
+    default: local
 
   flyway:
     locations: classpath:db/migration/matchmaking
@@ -25,4 +19,4 @@ microservice:
 
 logging:
   level:
-    io.github.quizup: DEBUG
+    io.github.quizup: ${QUIZUP_LOG_LEVEL:INFO}
