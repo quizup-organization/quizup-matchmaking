@@ -7,9 +7,10 @@ spring:
   flyway:
     locations: classpath:db/migration/matchmaking
 
-axon:
-  distributed:
-    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
 
 microservice:
   swagger:
