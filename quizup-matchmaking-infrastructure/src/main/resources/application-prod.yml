@@ -11,12 +11,8 @@ spring:
     username: ${QUIZUP_DB_USERNAME}
     password: ${QUIZUP_DB_PASSWORD}
 
-  rabbitmq:
-    host: ${QUIZUP_RABBITMQ_HOST:rabbitmq}
-    port: ${QUIZUP_RABBITMQ_PORT:5672}
-    username: ${QUIZUP_RABBITMQ_USERNAME}
-    password: ${QUIZUP_RABBITMQ_PASSWORD}
-    virtual-host: ${QUIZUP_RABBITMQ_VHOST:/}
+  kafka:
+    bootstrap-servers: ${QUIZUP_KAFKA_HOST:kafka}:${QUIZUP_KAFKA_PORT:9092}
 
 microservice:
   resource-server:

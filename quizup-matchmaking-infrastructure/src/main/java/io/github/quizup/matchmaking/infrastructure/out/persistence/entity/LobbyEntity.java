@@ -1,7 +1,7 @@
 package io.github.quizup.matchmaking.infrastructure.out.persistence.entity;
 
-import io.github.quizup.common.domain.model.search.FieldType;
-import io.github.quizup.common.domain.model.search.Searchable;
+import io.github.quizup.microservice.core.domain.model.search.FieldType;
+import io.github.quizup.microservice.core.domain.model.search.Searchable;
 import io.github.quizup.matchmaking.domain.model.LobbyStatus;
 import jakarta.persistence.*;
 import lombok.Getter;

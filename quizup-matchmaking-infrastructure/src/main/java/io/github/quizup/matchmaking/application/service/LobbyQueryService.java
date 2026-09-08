@@ -1,7 +1,7 @@
 package io.github.quizup.matchmaking.application.service;
 
-import io.github.quizup.common.domain.model.search.PageResult;
-import io.github.quizup.common.infrastructure.axon.PageResponseTypes;
+import io.github.quizup.microservice.core.domain.model.search.PageResult;
+import io.github.quizup.microservice.core.infrastructure.axon.PageResponseTypes;
 import io.github.quizup.matchmaking.domain.event.LobbyEvent;
 import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
 import io.github.quizup.matchmaking.domain.model.Lobby;

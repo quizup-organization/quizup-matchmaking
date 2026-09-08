@@ -6,6 +6,9 @@ spring:
     activate:
       on-profile: local
 
+  kafka:
+    bootstrap-servers: localhost:9092
+
   datasource:
     url: jdbc:postgresql://localhost:5432/quizup_matchmaking
     username: postgres

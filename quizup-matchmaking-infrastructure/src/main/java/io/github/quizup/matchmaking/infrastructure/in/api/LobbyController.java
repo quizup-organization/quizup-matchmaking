@@ -1,11 +1,11 @@
 package io.github.quizup.matchmaking.infrastructure.in.api;
 
-import io.github.quizup.common.domain.model.search.SearchCriteria;
-import io.github.quizup.common.infrastructure.in.api.ResponseEntityBuilder;
-import io.github.quizup.common.infrastructure.in.api.request.SearchRequest;
-import io.github.quizup.common.infrastructure.in.api.response.IdResponse;
-import io.github.quizup.common.infrastructure.in.api.response.PageResponse;
-import io.github.quizup.common.infrastructure.mapper.SearchRequestMapper;
+import io.github.quizup.microservice.core.domain.model.search.SearchCriteria;
+import io.github.quizup.microservice.core.infrastructure.in.api.ResponseEntityBuilder;
+import io.github.quizup.microservice.core.infrastructure.in.api.request.SearchRequest;
+import io.github.quizup.microservice.core.infrastructure.in.api.response.IdResponse;
+import io.github.quizup.microservice.core.infrastructure.in.api.response.PageResponse;
+import io.github.quizup.microservice.core.infrastructure.mapper.SearchRequestMapper;
 import io.github.quizup.matchmaking.domain.command.LobbyCommand;
 import io.github.quizup.matchmaking.domain.model.LobbyParticipantType;
 import io.github.quizup.matchmaking.domain.port.in.CancelLobbyUseCase;
@@ -19,7 +19,7 @@ import io.github.quizup.matchmaking.infrastructure.in.api.request.OpenLobbyReque
 import io.github.quizup.matchmaking.infrastructure.in.api.response.LobbyResponse;
 import io.github.quizup.matchmaking.infrastructure.out.messaging.mapper.LobbyEventNotificationMapper;
 import io.github.quizup.matchmaking.infrastructure.out.messaging.response.LobbyNotification;
-import io.github.quizup.microservice.infrastructure.security.SecurityHelper;
+import io.github.quizup.microservice.security.SecurityHelper;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

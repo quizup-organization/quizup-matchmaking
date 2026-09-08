@@ -1,9 +1,9 @@
 package io.github.quizup.matchmaking.infrastructure.out.persistence.adapter;
 
-import io.github.quizup.common.domain.model.search.PageResult;
-import io.github.quizup.common.domain.model.search.SearchCriteria;
-import io.github.quizup.common.infrastructure.adapter.AnnotationSearchableEntity;
-import io.github.quizup.common.infrastructure.adapter.JpaSearchAdapter;
+import io.github.quizup.microservice.core.domain.model.search.PageResult;
+import io.github.quizup.microservice.core.domain.model.search.SearchCriteria;
+import io.github.quizup.microservice.core.infrastructure.adapter.AnnotationSearchableEntity;
+import io.github.quizup.microservice.core.infrastructure.adapter.JpaSearchAdapter;
 import io.github.quizup.matchmaking.domain.model.Lobby;
 import io.github.quizup.matchmaking.domain.model.LobbyStatus;
 import io.github.quizup.matchmaking.domain.port.out.LobbyRepositoryPort;

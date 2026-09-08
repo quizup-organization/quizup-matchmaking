@@ -1,7 +1,7 @@
 package io.github.quizup.matchmaking.domain.exception;
 
-import io.github.quizup.common.domain.exception.BaseProblem;
-import io.github.quizup.common.domain.exception.ProblemCategory;
+import io.github.quizup.microservice.core.domain.exception.BaseProblem;
+import io.github.quizup.microservice.core.domain.exception.ProblemCategory;
 
 import java.util.HashMap;
 import java.util.Map;

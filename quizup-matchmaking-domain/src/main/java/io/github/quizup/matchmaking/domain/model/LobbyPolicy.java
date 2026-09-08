@@ -1,6 +1,6 @@
 package io.github.quizup.matchmaking.domain.model;
 
-import io.github.quizup.common.domain.constant.QuizUpConstants;
+import io.github.quizup.microservice.core.domain.constant.QuizUpConstants;
 
 /**
  * Règles métier du cycle de vie d'un lobby.

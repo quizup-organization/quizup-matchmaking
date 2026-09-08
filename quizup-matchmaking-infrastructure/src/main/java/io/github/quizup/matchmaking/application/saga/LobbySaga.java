@@ -8,6 +8,8 @@ import io.github.quizup.matchmaking.domain.event.LobbyEvent;
 import io.github.quizup.matchmaking.domain.model.LobbyDeadline;
 import io.github.quizup.matchmaking.domain.model.LobbyParticipantType;
 import io.github.quizup.matchmaking.domain.model.LobbyPolicy;
+import io.github.quizup.matchmaking.domain.port.out.UserPort;
+import io.github.quizup.microservice.core.domain.constant.QuizUpConstants;
 import lombok.Getter;
 import lombok.Setter;
 import org.axonframework.commandhandling.gateway.CommandGateway;
@@ -49,6 +51,9 @@ public class LobbySaga {
     @Autowired
     private transient DeadlineManager deadlineManager;
 
+    @Autowired
+    private transient UserPort userPort;
+
     @Getter
     @Setter
     private String lobbyId;
@@ -87,7 +92,16 @@ public class LobbySaga {
 
         GamePlayerType gamePlayerType = toGamePlayerType(event.challengerType());
 
-        commandGateway.send(new GameCommand.CreateGameCommand(gameId, topicId, initiatorId, challengerId, GameMode.SYNC, gamePlayerType));
+        commandGateway.send(new GameCommand.CreateGameCommand(
+                gameId,
+                topicId,
+                initiatorId,
+                userPort.findNameById(initiatorId),
+                challengerId,
+                toDisplayName(gamePlayerType, challengerId),
+                GameMode.SYNC,
+                gamePlayerType
+        ));
 
         commandGateway.send(new LobbyCommand.CompleteLobbyCommand(lobbyId, gameId));
 
@@ -123,6 +137,12 @@ public class LobbySaga {
             deadlineManager.cancelAllWithinScope(LobbyDeadline.MATCHMAKING_DEADLINE);
         } catch (Exception ignored) {
         }
+    }
+
+    private String toDisplayName(GamePlayerType gamePlayerType, String userId) {
+        return GamePlayerType.BOT.equals(gamePlayerType)
+                ? QuizUpConstants.BOT_USER_NAME
+                : userPort.findNameById(userId);
     }
 
     private GamePlayerType toGamePlayerType(LobbyParticipantType lobbyParticipantType) {

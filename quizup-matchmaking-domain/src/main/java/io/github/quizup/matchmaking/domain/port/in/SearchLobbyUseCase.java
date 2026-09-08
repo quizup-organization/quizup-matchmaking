@@ -1,9 +1,9 @@
 package io.github.quizup.matchmaking.domain.port.in;
 
-import io.github.quizup.common.domain.model.search.FilterCriteria;
-import io.github.quizup.common.domain.model.search.PageCriteria;
-import io.github.quizup.common.domain.model.search.PageResult;
-import io.github.quizup.common.domain.model.search.SortCriteria;
+import io.github.quizup.microservice.core.domain.model.search.FilterCriteria;
+import io.github.quizup.microservice.core.domain.model.search.PageCriteria;
+import io.github.quizup.microservice.core.domain.model.search.PageResult;
+import io.github.quizup.microservice.core.domain.model.search.SortCriteria;
 import io.github.quizup.matchmaking.domain.model.Lobby;
 import io.github.quizup.matchmaking.domain.query.LobbyQuery;
 

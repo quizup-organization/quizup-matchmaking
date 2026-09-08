@@ -1,6 +1,6 @@
 package io.github.quizup.matchmaking.domain.exception;
 
-import io.github.quizup.common.domain.exception.ProblemCategory;
+import io.github.quizup.microservice.core.domain.exception.ProblemCategory;
 
 public final class LobbyExceptions {
 
