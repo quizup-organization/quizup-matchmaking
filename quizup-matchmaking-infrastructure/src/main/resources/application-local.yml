@@ -9,6 +9,38 @@ spring:
   kafka:
     bootstrap-servers: localhost:9092
 
+  cloud:
+    discovery:
+      client:
+        simple:
+          instances:
+            quizup-identity:
+              - uri: http://localhost:8085
+            quizup-theme:
+              - uri: http://localhost:8086
+            quizup-game:
+              - uri: http://localhost:8082
+            quizup-social:
+              - uri: http://localhost:8087
+            quizup-matchmaking:
+              - uri: http://localhost:8090
+
+  security:
+    oauth2:
+      client:
+        registration:
+          server-client:
+            provider: quizup-identity
+            client-id: server
+            client-secret: ${QUIZUP_IDENTITY_SERVER_CLIENT_SECRET:server-secret}
+            authorization-grant-type: client_credentials
+            scope:
+              - openid
+        provider:
+          quizup-identity:
+            token-uri: http://localhost:8085/oauth2/token
+            jwk-set-uri: http://localhost:8085/oauth2/jwks
+
   datasource:
     url: jdbc:postgresql://localhost:5432/quizup_matchmaking
     username: postgres
