@@ -1,0 +1,12 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  ci:
+    uses: quizup-organization/quizup-reusable-workflows/.github/workflows/service-ci.yml@main
+    with:
+      github-username: ${{ vars.QUIZUP_GITHUB_USERNAME }}
+    secrets:
+      GITHUB_PASSWORD: ${{ secrets.QUIZUP_GITHUB_TOKEN }}
+

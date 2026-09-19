@@ -1,0 +1,23 @@
+spring:
+  profiles:
+    default: local
+  application:
+    name: quizup-matchmaking
+
+  flyway:
+    locations: classpath:db/migration/matchmaking
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+microservice:
+  swagger:
+    description: QuizUp Matchmaking Module - Lobby-based player matching
+  websocket:
+    enabled: true
+
+logging:
+  level:
+    io.github.quizup: ${QUIZUP_LOG_LEVEL:INFO}
