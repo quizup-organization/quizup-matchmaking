@@ -1,0 +1,9 @@
+## 1.0.0 (2026-09-19)
+
+### Features
+
+* first commit ([35f3804](https://github.com/quizup-organization/quizup-matchmaking/commit/35f3804ea72deb639d49783d3bb9426ab2e70f02))
+
+### Bug Fixes
+
+* **maven:** pin inter-service domains to 0.0.1; align parent to quizup-parent 1.0.0 ([6849525](https://github.com/quizup-organization/quizup-matchmaking/commit/6849525f52ab995c68d5ccd3c2db14f4e7de2d44))
