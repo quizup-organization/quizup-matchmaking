@@ -13,11 +13,6 @@
 
     <artifactId>quizup-matchmaking-infrastructure</artifactId>
 
-    <properties>
-        <quizup-game-domain.version>1.0.0-SNAPSHOT</quizup-game-domain.version>
-        <quizup-profile-domain.version>1.0.0-SNAPSHOT</quizup-profile-domain.version>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>io.github.quizup</groupId>
@@ -27,12 +22,12 @@
         <dependency>
             <groupId>io.github.quizup</groupId>
             <artifactId>quizup-game-domain</artifactId>
-            <version>${quizup-game-domain.version}</version>
+            <version>0.0.1</version>
         </dependency>
         <dependency>
             <groupId>io.github.quizup</groupId>
             <artifactId>quizup-profile-domain</artifactId>
-            <version>${quizup-profile-domain.version}</version>
+            <version>0.0.1</version>
         </dependency>
         <dependency>
             <groupId>io.github.quizup</groupId>
