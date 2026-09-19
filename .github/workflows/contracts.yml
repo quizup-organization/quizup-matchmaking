@@ -1,0 +1,21 @@
+name: Contracts Bootstrap
+
+# Publie uniquement le POM parent + le *-domain (contrats) — voir domain-bootstrap.yml.
+# Manuel : amorçage / republication des contrats inter-services.
+on:
+  workflow_dispatch:
+    inputs:
+      contracts-version:
+        description: "Version des contrats (domains) à publier"
+        required: false
+        default: "0.0.1"
+
+jobs:
+  bootstrap:
+    uses: quizup-organization/quizup-reusable-workflows/.github/workflows/domain-bootstrap.yml@main
+    with:
+      github-username: ${{ vars.QUIZUP_GITHUB_USERNAME }}
+      service-name: matchmaking
+      contracts-version: ${{ inputs.contracts-version }}
+    secrets:
+      GITHUB_PASSWORD: ${{ secrets.QUIZUP_GITHUB_TOKEN }}

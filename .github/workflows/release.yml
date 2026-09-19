@@ -2,6 +2,9 @@ name: Release
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '.github/workflows/**'
+      - '**.md'
 jobs:
   release:
     uses: quizup-organization/quizup-reusable-workflows/.github/workflows/service-release.yml@main
