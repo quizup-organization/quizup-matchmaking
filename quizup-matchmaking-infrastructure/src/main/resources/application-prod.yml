@@ -17,11 +17,11 @@ spring:
 microservice:
   resource-server:
     jwt:
-      issuer-uri: ${QUIZUP_AUTH_SERVER_URL:http://identity.quizup-prod.svc.cluster.local:8080}
-      jwk-set-uri: ${QUIZUP_AUTH_SERVER_JWKS_URL:http://identity.quizup-prod.svc.cluster.local:8080/oauth2/jwks}
+      issuer-uri: ${QUIZUP_AUTH_SERVER_URL:http://quizup-identity.quizup-prod.svc.cluster.local}
+      jwk-set-uri: ${QUIZUP_AUTH_SERVER_JWKS_URL:http://quizup-identity.quizup-prod.svc.cluster.local/oauth2/jwks}
   swagger:
     oauth2:
-      authorization-server-url: ${QUIZUP_AUTH_SERVER_URL:http://identity.quizup-prod.svc.cluster.local:8080}
+      authorization-server-url: ${QUIZUP_AUTH_SERVER_URL:http://quizup-identity.quizup-prod.svc.cluster.local}
 
 logging:
   level:
