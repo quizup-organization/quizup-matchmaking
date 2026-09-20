@@ -1,3 +1,9 @@
+## [1.4.6](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.5...v1.4.6) (2026-09-20)
+
+### Bug Fixes
+
+* **deps:** bump quizup-sdk to 2.1.1 ([a43735e](https://github.com/quizup-organization/quizup-matchmaking/commit/a43735e1a0ddeebeed0f83e7464abc3d14e9f6c9))
+
 ## [1.4.5](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.4...v1.4.5) (2026-09-20)
 
 ### Bug Fixes
