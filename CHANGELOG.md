@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.0.0...v1.1.0) (2026-09-20)
+
+### Features
+
+* **observability:** consume quizup-sdk 1.1.0 (Prometheus metrics) ([693af63](https://github.com/quizup-organization/quizup-matchmaking/commit/693af632decd5feb1ea107143bac792fc605b3d7))
+
 ## 1.0.0 (2026-09-19)
 
 ### Features
