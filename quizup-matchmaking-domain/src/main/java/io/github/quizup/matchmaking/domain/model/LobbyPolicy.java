@@ -9,7 +9,7 @@ public final class LobbyPolicy {
 
     private LobbyPolicy() {}
 
-    public static final String BOT_PLAYER_ID = QuizUpConstants.BOT_USER_ID;
+    public static final String BOT_PLAYER_ID = QuizUpConstants.SYSTEM_USER_ID;
 
     /** Détermine si un bot doit être injecté comme challenger. */
     public static boolean shouldFallbackToBot(String challengerId) {
