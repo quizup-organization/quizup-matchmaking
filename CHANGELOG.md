@@ -1,3 +1,9 @@
+## [1.2.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.1.0...v1.2.0) (2026-09-20)
+
+### Features
+
+* **observability:** consume quizup-sdk 1.2.0 (structured logs + tracing) ([d847538](https://github.com/quizup-organization/quizup-matchmaking/commit/d847538200853e465529abb309731d2777ffc764))
+
 ## [1.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.0.0...v1.1.0) (2026-09-20)
 
 ### Features
