@@ -1,3 +1,9 @@
+## [1.3.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.2.0...v1.3.0) (2026-09-20)
+
+### Features
+
+* **observability:** matchmaking KPIs (lobbies, matches, wait time) + consume quizup-sdk 1.3.0 ([b4dd339](https://github.com/quizup-organization/quizup-matchmaking/commit/b4dd33979a10bbe0b49791ffa5f2d17f09dec927))
+
 ## [1.2.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.1.0...v1.2.0) (2026-09-20)
 
 ### Features
