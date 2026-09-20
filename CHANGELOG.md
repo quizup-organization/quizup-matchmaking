@@ -1,3 +1,9 @@
+## [1.4.3](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.2...v1.4.3) (2026-09-20)
+
+### Bug Fixes
+
+* **system:** use the unified system account ([d4a03ce](https://github.com/quizup-organization/quizup-matchmaking/commit/d4a03ce6aeb706a5a7f3a6f42c2b2666885e6aeb))
+
 ## [1.4.2](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.1...v1.4.2) (2026-09-20)
 
 ### Bug Fixes
