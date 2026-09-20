@@ -1,3 +1,9 @@
+## [1.4.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.0...v1.4.1) (2026-09-20)
+
+### Bug Fixes
+
+* **observability:** consume quizup-sdk 1.4.2 (Axon activity metrics fix + Swagger server URL) ([fa5dfd5](https://github.com/quizup-organization/quizup-matchmaking/commit/fa5dfd54ca4033cb21c9d1af104e03226de22a1a))
+
 ## [1.4.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.3.0...v1.4.0) (2026-09-20)
 
 ### Features
