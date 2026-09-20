@@ -1,3 +1,9 @@
+## [1.4.2](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.1...v1.4.2) (2026-09-20)
+
+### Bug Fixes
+
+* **observability:** remove WebSocket and business KPI metrics (consume quizup-sdk 1.4.3) ([15e80dc](https://github.com/quizup-organization/quizup-matchmaking/commit/15e80dc37359431b48a862b1105dfd28a3aaf859))
+
 ## [1.4.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.0...v1.4.1) (2026-09-20)
 
 ### Bug Fixes
