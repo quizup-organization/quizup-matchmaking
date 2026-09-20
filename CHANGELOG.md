@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.3.0...v1.4.0) (2026-09-20)
+
+### Features
+
+* **observability:** consume quizup-sdk 1.4.0 (Axon activity metrics) ([69f19b9](https://github.com/quizup-organization/quizup-matchmaking/commit/69f19b9e05632025de33e4684a4cd39c806d56ab))
+
 ## [1.3.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.2.0...v1.3.0) (2026-09-20)
 
 ### Features
