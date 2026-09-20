@@ -1,3 +1,9 @@
+## [1.4.5](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.4...v1.4.5) (2026-09-20)
+
+### Bug Fixes
+
+* **config:** align prod service URLs with quizup-* names ([6f70e13](https://github.com/quizup-organization/quizup-matchmaking/commit/6f70e139d7aa900225ac4dfffa64b8d190085dfc))
+
 ## [1.4.4](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.3...v1.4.4) (2026-09-20)
 
 ### Bug Fixes
