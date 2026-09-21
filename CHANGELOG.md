@@ -1,3 +1,9 @@
+## [1.4.7](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.6...v1.4.7) (2026-09-21)
+
+### Bug Fixes
+
+* **observability:** keep readable console logs in local ([774bfb8](https://github.com/quizup-organization/quizup-matchmaking/commit/774bfb8adcd42e672ec155f879c9f90cd64e7765))
+
 ## [1.4.6](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.5...v1.4.6) (2026-09-20)
 
 ### Bug Fixes
