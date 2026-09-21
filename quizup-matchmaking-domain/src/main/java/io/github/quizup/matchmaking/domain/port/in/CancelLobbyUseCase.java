@@ -11,9 +11,5 @@ public interface CancelLobbyUseCase {
     default CompletableFuture<String> cancel(String lobbyId, String initiatorId) {
         return cancel(new LobbyCommand.CancelLobbyCommand(lobbyId, initiatorId));
     }
-
-    default void cancelAndWait(String lobbyId, String initiatorId) {
-        cancel(lobbyId, initiatorId).join();
-    }
 }
 

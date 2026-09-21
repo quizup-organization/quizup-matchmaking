@@ -49,12 +49,6 @@ public final class LobbyEventNotificationMapper {
                     )
             );
 
-            case LobbyEvent.LobbyExpiredEvent lobbyExpiredEvent -> Optional.of(
-                    new LobbyNotification.LobbyExpiredNotification(
-                            lobbyExpiredEvent.lobbyId()
-                    )
-            );
-
             default -> Optional.empty();
         };
     }

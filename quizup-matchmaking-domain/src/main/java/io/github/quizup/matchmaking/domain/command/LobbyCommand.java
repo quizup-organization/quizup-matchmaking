@@ -48,8 +48,4 @@ public interface LobbyCommand {
     record PurgeLobbyCommand(
             @TargetAggregateIdentifier String lobbyId
     ) implements LobbyCommand {}
-
-    record ExpireLobbyCommand(
-            @TargetAggregateIdentifier String lobbyId
-    ) implements LobbyCommand {}
 }

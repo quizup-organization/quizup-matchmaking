@@ -11,9 +11,5 @@ public interface OpenLobbyUseCase {
     default CompletableFuture<String> open(String lobbyId, String initiatorId, String topicId) {
         return open(new LobbyCommand.OpenLobbyCommand(lobbyId, initiatorId, topicId));
     }
-
-    default void openAndWait(String lobbyId, String initiatorId, String topicId) {
-        open(lobbyId, initiatorId, topicId).join();
-    }
 }
 

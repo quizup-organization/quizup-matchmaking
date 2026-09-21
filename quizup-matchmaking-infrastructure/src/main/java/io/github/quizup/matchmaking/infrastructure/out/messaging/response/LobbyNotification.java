@@ -17,8 +17,7 @@ public interface LobbyNotification {
         OPENED,
         JOINED,
         COMPLETED,
-        CANCELLED,
-        EXPIRED
+        CANCELLED
     }
 
     record LobbyOpenedNotification(
@@ -64,16 +63,6 @@ public interface LobbyNotification {
         @Override
         public LobbyNotificationType type() {
             return LobbyNotificationType.CANCELLED;
-        }
-    }
-
-    record LobbyExpiredNotification(
-            String lobbyId
-    ) implements LobbyNotification {
-
-        @Override
-        public LobbyNotificationType type() {
-            return LobbyNotificationType.EXPIRED;
         }
     }
 }

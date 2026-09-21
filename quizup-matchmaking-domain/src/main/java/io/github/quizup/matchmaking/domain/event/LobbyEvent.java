@@ -38,11 +38,6 @@ public interface LobbyEvent {
             Instant closedAt
     ) implements LobbyEvent {}
 
-    record LobbyExpiredEvent(
-            String lobbyId,
-            Instant expiredAt
-    ) implements LobbyEvent {}
-
     /**
      * Le lobby est purgé après rétention : l'agrégat est supprimé et la projection
      * supprime sa ligne. Émis par {@code PurgeLobbyCommand}.

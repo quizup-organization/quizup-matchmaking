@@ -12,9 +12,5 @@ public interface JoinLobbyUseCase {
     default CompletableFuture<String> join(String lobbyId, String challengerId, LobbyParticipantType challengerType) {
         return join(new LobbyCommand.JoinLobbyCommand(lobbyId, challengerId, challengerType));
     }
-
-    default void joinAndWait(String lobbyId, String challengerId, LobbyParticipantType challengerType) {
-        join(lobbyId, challengerId, challengerType).join();
-    }
 }
 
