@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:classpath:quizup-defaults.yml
   profiles:
     default: local
   application:
@@ -18,6 +20,4 @@ microservice:
   websocket:
     enabled: true
 
-logging:
-  level:
-    io.github.quizup: ${QUIZUP_LOG_LEVEL:INFO}
+
