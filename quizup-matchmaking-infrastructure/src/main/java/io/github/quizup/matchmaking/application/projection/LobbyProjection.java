@@ -5,6 +5,7 @@ import io.github.quizup.matchmaking.domain.model.LobbyParticipantType;
 import io.github.quizup.matchmaking.domain.model.Lobby;
 import io.github.quizup.matchmaking.domain.model.LobbyStatus;
 import io.github.quizup.matchmaking.domain.port.out.LobbyRepositoryPort;
+import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code LobbyPurgedEvent} (piloté par la {@code LobbySaga}).
  */
 @Component
+@ProcessingGroup("lobby-projection")
 public class LobbyProjection {
 
     private final LobbyRepositoryPort lobbyRepositoryPort;

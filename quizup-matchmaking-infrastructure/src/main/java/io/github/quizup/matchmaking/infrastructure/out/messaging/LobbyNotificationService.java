@@ -4,6 +4,7 @@ import io.github.quizup.matchmaking.domain.event.LobbyEvent;
 import io.github.quizup.matchmaking.infrastructure.out.messaging.mapper.LobbyEventNotificationMapper;
 import io.github.quizup.matchmaking.infrastructure.out.messaging.response.LobbyNotification;
 import io.github.quizup.microservice.core.domain.model.notification.NotificationEnvelope;
+import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.DomainEventMessage;
 import org.axonframework.eventhandling.EventHandler;
 import org.axonframework.eventhandling.EventMessage;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
  * {@code GET /api/lobbies/{lobbyId}/notifications}.
  */
 @Service
+@ProcessingGroup("lobby-notification")
 public class LobbyNotificationService {
     private static final Logger logger = LoggerFactory.getLogger(LobbyNotificationService.class);
     private static final String DESTINATION_PREFIX = "/topic/lobbies/";

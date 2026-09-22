@@ -13,6 +13,7 @@ import io.github.quizup.matchmaking.domain.port.out.ProfileRepositoryPort;
 import lombok.Getter;
 import lombok.Setter;
 import org.axonframework.commandhandling.gateway.CommandGateway;
+import org.axonframework.config.ProcessingGroup;
 import org.axonframework.deadline.DeadlineManager;
 import org.axonframework.deadline.annotation.DeadlineHandler;
 import org.axonframework.modelling.saga.EndSaga;
@@ -42,6 +43,7 @@ import java.util.UUID;
  * 5. LobbyPurgedEvent → saga terminée
  */
 @Saga
+@ProcessingGroup("lobby-saga")
 public class LobbySaga {
 
     private static final Logger logger = LoggerFactory.getLogger(LobbySaga.class);
