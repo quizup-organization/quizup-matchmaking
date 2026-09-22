@@ -1,3 +1,9 @@
+## [1.5.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.7...v1.5.0) (2026-09-22)
+
+### Features
+
+* **matchmaking:** explicit Axon processing groups ([15ee9ed](https://github.com/quizup-organization/quizup-matchmaking/commit/15ee9ed43e35754b2f43b3c073d9128d279d5fa7))
+
 ## [1.4.7](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.4.6...v1.4.7) (2026-09-21)
 
 ### Bug Fixes
