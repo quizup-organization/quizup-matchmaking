@@ -1,3 +1,9 @@
+## [1.5.3](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.5.2...v1.5.3) (2026-09-22)
+
+### Bug Fixes
+
+* **quizup-matchmaking:** upgrade quizup-parent to 2.3.3 ([65a0611](https://github.com/quizup-organization/quizup-matchmaking/commit/65a06112a682eeb4f5a7b8141e7b0fa05f7de194))
+
 ## [1.5.2](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.5.1...v1.5.2) (2026-09-22)
 
 ### Bug Fixes
