@@ -1,3 +1,9 @@
+## [1.5.5](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.5.4...v1.5.5) (2026-09-23)
+
+### Bug Fixes
+
+* **matchmaking:** lobby/queue cancel as POST action and bump SDK to 2.4.1 ([677fc34](https://github.com/quizup-organization/quizup-matchmaking/commit/677fc341cd7825a35b17dee44b9a29f9a741a6bc))
+
 ## [1.5.4](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.5.3...v1.5.4) (2026-09-22)
 
 ### Bug Fixes
