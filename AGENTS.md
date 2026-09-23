@@ -28,7 +28,7 @@ rejoindre, annulation. Les lobbies sont le point d'entrée pour démarrer un jeu
 | GET     | `/api/lobbies/{lobbyId}`               | `get(String)`              | `LobbyResponse`                 |
 | GET     | `/api/lobbies/{lobbyId}/notifications` | `notifications(String)`    | `Collection<NotificationEnvelope<LobbyNotification>>` |
 | POST    | `/api/lobbies/{lobbyId}/join`          | `join(String)`             | `IdResponse`                    |
-| DELETE  | `/api/lobbies/{lobbyId}`               | `cancel(String)`           | `IdResponse`                    |
+| POST    | `/api/lobbies/{lobbyId}/cancel`        | `cancel(String)`           | `IdResponse`                    |
 
 **DTO** : `LobbyResponse`, `LobbyNotification` (interface polymorphe, pattern notifications §6).
 Historique **et** push sont enveloppés dans `NotificationEnvelope<LobbyNotification>` (SDK) :
@@ -61,7 +61,7 @@ Implémentation : `application/service/UserService` (→ profile, `.map(Profile:
 
 ### File d'attente (`/api/matchmaking/queue`)
 
-- `POST /api/matchmaking/queue` → met en file (ticket = lobby) ; `GET /{id}` ; `DELETE /{id}`.
+- `POST /api/matchmaking/queue` → met en file (ticket = lobby) ; `GET /{id}` ; `POST /{id}/cancel` → `200` (annule le lobby associé, transition d'état).
 - `MatchmakingService` (application) apparie par **sujet + niveau ±5 + préférence pays**, via
   `MatchmakingPlayerPort` (profil + progression). S'il n'y a pas d'adversaire compatible, un
   lobby est ouvert ; `LobbySaga` gère le **fallback bot** après expiration.

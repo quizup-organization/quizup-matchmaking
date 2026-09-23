@@ -61,9 +61,10 @@ public class MatchmakingController {
     }
 
     /**
-     * Annule la recherche (initiateur seulement).
+     * Annule la recherche (initiateur seulement) — annule le lobby associé au ticket
+     * ({@code LobbyCancelledEvent}), donc {@code POST /{id}/cancel} et non un {@code DELETE}.
      */
-    @DeleteMapping("/{ticketId}")
+    @PostMapping("/{ticketId}/cancel")
     public CompletableFuture<ResponseEntity<IdResponse>> cancel(@PathVariable String ticketId) {
         String playerId = SecurityHelper.getUserId();
         return matchmakingUseCase.cancel(playerId, ticketId)

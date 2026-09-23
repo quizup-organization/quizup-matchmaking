@@ -38,7 +38,8 @@ import java.util.concurrent.CompletableFuture;
  * POST   /api/lobbies               → Crée un nouveau lobby
  * GET    /api/lobbies/{id}          → Détail d'un lobby
  * POST   /api/lobbies/{id}/join     → Rejoint un lobby existant
- * DELETE /api/lobbies/{id}          → Annule le lobby (initiateur seulement)
+ * POST   /api/lobbies/{id}/cancel   → Annule le lobby (initiateur seulement ; transition d'état,
+ *                                     le lobby n'est pas supprimé)
  * <p>
  * Flow client recommandé :
  * 1. POST /search avec les filtres du client
@@ -146,9 +147,10 @@ public class LobbyController {
     }
 
     /**
-     * Annule un lobby (initiateur seulement).
+     * Annule un lobby (initiateur seulement) — transition d'état sur l'agrégat
+     * ({@code LobbyCancelledEvent}), donc {@code POST /{id}/cancel} et non un {@code DELETE}.
      */
-    @DeleteMapping("/{lobbyId}")
+    @PostMapping("/{lobbyId}/cancel")
     public CompletableFuture<ResponseEntity<IdResponse>> cancel(@PathVariable String lobbyId) {
         String playerId = SecurityHelper.getUserId();
         logger.info("Annulation lobby: lobbyId={}, initiatorId={}", lobbyId, playerId);
