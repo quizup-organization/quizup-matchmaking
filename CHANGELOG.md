@@ -1,3 +1,9 @@
+## [1.6.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.6.0...v1.6.1) (2026-09-24)
+
+### Bug Fixes
+
+* **deps:** bump quizup-parent to 2.4.2 (search criteria type info) ([2609d2c](https://github.com/quizup-organization/quizup-matchmaking/commit/2609d2c815f7a29b94a2bc1cac1c4fa4885cd731))
+
 ## [1.6.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.5.5...v1.6.0) (2026-09-24)
 
 ### Features
