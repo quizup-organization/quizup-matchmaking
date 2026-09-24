@@ -1,3 +1,9 @@
+## [1.6.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.5.5...v1.6.0) (2026-09-24)
+
+### Features
+
+* **matchmaking:** handle enqueue/cancel matchmaking commands on the distributed bus ([0104817](https://github.com/quizup-organization/quizup-matchmaking/commit/0104817916d0f54d3be4288683de527d143102c4))
+
 ## [1.5.5](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.5.4...v1.5.5) (2026-09-23)
 
 ### Bug Fixes
