@@ -1,3 +1,9 @@
+## [1.6.3](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.6.2...v1.6.3) (2026-09-24)
+
+### Bug Fixes
+
+* **deps:** bump quizup-parent to 2.4.4 (typed PageResult over query transport) ([d819424](https://github.com/quizup-organization/quizup-matchmaking/commit/d81942424e46fe9d864d23a2b5b9e142c85f4639))
+
 ## [1.6.2](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.6.1...v1.6.2) (2026-09-24)
 
 ### Bug Fixes
