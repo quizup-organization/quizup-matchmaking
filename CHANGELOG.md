@@ -1,3 +1,15 @@
+## [2.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.6.3...v2.0.0) (2026-09-25)
+
+### ⚠ BREAKING CHANGES
+
+* **matchmaking:** the service no longer exposes its REST API nor WebSocket (the
+BFF is the sole surface); the queue command handlers are synchronous and search
+use cases use the SDK SearchRequest/SearchResponse DTOs.
+
+### Features
+
+* **matchmaking:** headless service + synchronous queue command handlers ([31790c7](https://github.com/quizup-organization/quizup-matchmaking/commit/31790c7f7733d1d6e4b54122618131342d3b28d9))
+
 ## [1.6.3](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.6.2...v1.6.3) (2026-09-24)
 
 ### Bug Fixes
