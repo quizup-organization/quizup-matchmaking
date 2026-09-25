@@ -1,7 +1,7 @@
 package io.github.quizup.matchmaking.application.handler.query;
 
 import io.github.quizup.microservice.core.domain.model.notification.NotificationEnvelope;
-import io.github.quizup.microservice.core.domain.model.search.PageResult;
+import io.github.quizup.microservice.core.infrastructure.in.api.response.SearchResponse;
 import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
 import io.github.quizup.matchmaking.domain.event.LobbyEvent;
 import io.github.quizup.matchmaking.domain.model.Lobby;
@@ -62,7 +62,7 @@ public class LobbyQueryHandler {
     }
 
     @QueryHandler
-    public PageResult<Lobby> handle(LobbyQuery.SearchLobbyQuery query) {
-        return lobbyRepositoryPort.findAll(query);
+    public SearchResponse<Lobby> handle(LobbyQuery.SearchLobbyQuery query) {
+        return lobbyRepositoryPort.findAll(query.request());
     }
 }

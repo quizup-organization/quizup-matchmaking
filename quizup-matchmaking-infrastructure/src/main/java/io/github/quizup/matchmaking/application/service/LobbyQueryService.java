@@ -2,7 +2,7 @@ package io.github.quizup.matchmaking.application.service;
 
 import io.github.quizup.microservice.core.infrastructure.axon.QueryResponseTypes;
 import io.github.quizup.microservice.core.domain.model.notification.NotificationEnvelope;
-import io.github.quizup.microservice.core.domain.model.search.PageResult;
+import io.github.quizup.microservice.core.infrastructure.in.api.response.SearchResponse;
 import io.github.quizup.matchmaking.domain.event.LobbyEvent;
 import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
 import io.github.quizup.matchmaking.domain.model.Lobby;
@@ -45,8 +45,8 @@ public class LobbyQueryService implements GetLobbyUseCase, GetOpenLobbiesByTopic
     }
 
     @Override
-    public CompletableFuture<PageResult<Lobby>> search(LobbyQuery.SearchLobbyQuery query) {
-        return queryGateway.query(query, QueryResponseTypes.pageResultOf(Lobby.class));
+    public CompletableFuture<SearchResponse<Lobby>> search(LobbyQuery.SearchLobbyQuery query) {
+        return queryGateway.query(query, QueryResponseTypes.searchResponseOf(Lobby.class));
     }
 }
 

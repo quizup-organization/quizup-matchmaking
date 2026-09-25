@@ -1,7 +1,7 @@
 package io.github.quizup.matchmaking.domain.port.out;
 
-import io.github.quizup.microservice.core.domain.model.search.PageResult;
-import io.github.quizup.microservice.core.domain.model.search.SearchCriteria;
+import io.github.quizup.microservice.core.infrastructure.in.api.request.SearchRequest;
+import io.github.quizup.microservice.core.infrastructure.in.api.response.SearchResponse;
 import io.github.quizup.matchmaking.domain.model.Lobby;
 
 import java.util.List;
@@ -17,7 +17,7 @@ public interface LobbyRepositoryPort {
 
     List<Lobby> findOpenByTopicId(String topicId);
 
-    PageResult<Lobby> findAll(SearchCriteria searchCriteria);
+    SearchResponse<Lobby> findAll(SearchRequest request);
 
     void deleteById(String lobbyId);
 }

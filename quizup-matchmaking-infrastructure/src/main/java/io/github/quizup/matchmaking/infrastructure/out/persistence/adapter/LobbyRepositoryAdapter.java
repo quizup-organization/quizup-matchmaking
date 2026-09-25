@@ -1,7 +1,7 @@
 package io.github.quizup.matchmaking.infrastructure.out.persistence.adapter;
 
-import io.github.quizup.microservice.core.domain.model.search.PageResult;
-import io.github.quizup.microservice.core.domain.model.search.SearchCriteria;
+import io.github.quizup.microservice.core.infrastructure.in.api.request.SearchRequest;
+import io.github.quizup.microservice.core.infrastructure.in.api.response.SearchResponse;
 import io.github.quizup.microservice.core.infrastructure.adapter.AnnotationSearchableEntity;
 import io.github.quizup.microservice.core.infrastructure.adapter.JpaSearchAdapter;
 import io.github.quizup.matchmaking.domain.model.Lobby;
@@ -60,8 +60,8 @@ public class LobbyRepositoryAdapter implements LobbyRepositoryPort {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<Lobby> findAll(SearchCriteria searchCriteria) {
-        return lobbyJpaSearchAdapter.findAll(searchCriteria)
+    public SearchResponse<Lobby> findAll(SearchRequest request) {
+        return lobbyJpaSearchAdapter.findAll(request)
                 .map(LobbyEntityMapper::toDomain);
     }
 

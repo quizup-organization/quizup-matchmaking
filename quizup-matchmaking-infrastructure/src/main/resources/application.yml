@@ -18,6 +18,7 @@ microservice:
   swagger:
     description: QuizUp Matchmaking Module - Lobby-based player matching
   websocket:
-    enabled: true
+    # Surface REST/WS portée par le BFF ; les services sont headless.
+    enabled: false
 
 

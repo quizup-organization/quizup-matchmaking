@@ -17,26 +17,12 @@ rejoindre, annulation. Les lobbies sont le point d'entrée pour démarrer un jeu
 
 ---
 
-## 2. Endpoints REST
+## 2. Surface (headless)
 
-### `LobbyController` — `/api/lobbies`
-
-| Méthode | Chemin                                 | Handler                    | Response                        |
-|---------|----------------------------------------|----------------------------|---------------------------------|
-| POST    | `/api/lobbies/search`                  | `search(SearchRequest)`    | `PageResponse<LobbyResponse>`   |
-| POST    | `/api/lobbies`                         | `create(OpenLobbyRequest)` | `IdResponse`                    |
-| GET     | `/api/lobbies/{lobbyId}`               | `get(String)`              | `LobbyResponse`                 |
-| GET     | `/api/lobbies/{lobbyId}/notifications` | `notifications(String)`    | `Collection<NotificationEnvelope<LobbyNotification>>` |
-| POST    | `/api/lobbies/{lobbyId}/join`          | `join(String)`             | `IdResponse`                    |
-| POST    | `/api/lobbies/{lobbyId}/cancel`        | `cancel(String)`           | `IdResponse`                    |
-
-**DTO** : `LobbyResponse`, `LobbyNotification` (interface polymorphe, pattern notifications §6).
-Historique **et** push sont enveloppés dans `NotificationEnvelope<LobbyNotification>` (SDK) :
-`notificationId`, `aggregateId`, `sequenceNumber`, `occurredAt`, `payload` → le client fold l'état du
-lobby (statut, `gameId`) et déduplique par `sequenceNumber` (plus de polling côté web).
-
----
-
+Service **headless** : aucun contrôleur REST ni WebSocket. La surface applicative unique est le
+**`quizup-bff`** (`/api/**` + `/ws`) ; il interroge ce service via le **query bus** Axon et consomme
+ses événements. Les handlers de requête/commande, sagas et projections restent la seule surface
+exposée par le service.
 ## 3. Use cases (ports entrants — `domain/port/in/`)
 
 - `OpenLobbyUseCase` — création d'un lobby ouvert

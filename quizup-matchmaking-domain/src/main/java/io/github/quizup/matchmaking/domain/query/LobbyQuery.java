@@ -1,22 +1,13 @@
 package io.github.quizup.matchmaking.domain.query;
 
-import io.github.quizup.microservice.core.domain.model.search.FilterCriteria;
-import io.github.quizup.microservice.core.domain.model.search.PageCriteria;
-import io.github.quizup.microservice.core.domain.model.search.SortCriteria;
-import io.github.quizup.microservice.core.domain.query.SearchQuery;
-
-import java.util.List;
+import io.github.quizup.microservice.core.infrastructure.in.api.request.SearchRequest;
 
 /**
  * Marker interface pour les queries du domaine Lobby.
  */
 public interface LobbyQuery {
 
-    record SearchLobbyQuery(
-            List<FilterCriteria> filters,
-            List<SortCriteria> sorts,
-            PageCriteria page
-    ) implements LobbyQuery, SearchQuery {
+    record SearchLobbyQuery(SearchRequest request) implements LobbyQuery {
     }
 
     record FindFirstOpenLobbyByTopicId(String topicId) implements LobbyQuery {
