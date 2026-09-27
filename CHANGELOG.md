@@ -1,3 +1,9 @@
+## [2.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v2.0.0...v2.1.0) (2026-09-27)
+
+### Features
+
+* **matchmaking:** ticket read model, presence-aware matching and bounded bot fallback ([dad5241](https://github.com/quizup-organization/quizup-matchmaking/commit/dad5241dc2c426002a8a17ed49d89982cd3e7ff4))
+
 ## [2.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v1.6.3...v2.0.0) (2026-09-25)
 
 ### ⚠ BREAKING CHANGES
