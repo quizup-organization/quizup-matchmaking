@@ -2,6 +2,7 @@ package io.github.quizup.matchmaking.application.service;
 
 import io.github.quizup.matchmaking.domain.command.LobbyCommand;
 import io.github.quizup.matchmaking.domain.command.MatchmakingCommand;
+import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
 import io.github.quizup.matchmaking.domain.model.Lobby;
 import io.github.quizup.matchmaking.domain.model.LobbyParticipantType;
 import io.github.quizup.matchmaking.domain.model.MatchmakingRules;
@@ -15,20 +16,29 @@ import io.github.quizup.matchmaking.domain.port.out.MatchmakingPlayerPort;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /**
- * Service applicatif de la file d'attente : appariement par sujet, niveau (±5)
- * et préférence pays. Si aucun adversaire compatible n'est trouvé, un lobby est
- * ouvert — la {@code LobbySaga} gère le fallback bot après expiration.
+ * Service applicatif de la file d'attente : appariement par sujet, niveau (±5), préférence pays,
+ * **et présence** (on ne rejoint jamais un lobby dont l'initiateur est hors ligne). Si aucun
+ * adversaire compatible n'est trouvé, un lobby est ouvert — la {@code LobbySaga} gère le fallback
+ * bot automatique après expiration, ou annule si l'initiateur a disparu.
+ *
+ * <p>Race de join : entre la sélection et l'envoi de la commande, un lobby peut être annulé ou
+ * rempli ; la commande est alors rejouée sur le candidat suivant (borné).</p>
  */
 @Service
 public class MatchmakingService implements MatchmakingUseCase {
+
+    private static final int MAX_JOIN_ATTEMPTS = 3;
 
     private final GetOpenLobbiesByTopicUseCase getOpenLobbiesByTopicUseCase;
     private final OpenLobbyUseCase openLobbyUseCase;
@@ -53,21 +63,7 @@ public class MatchmakingService implements MatchmakingUseCase {
         PlayerSummary player = matchmakingPlayerPort.getPlayer(command.playerId());
 
         return getOpenLobbiesByTopicUseCase.getOpenByTopicId(command.topicId())
-                .thenCompose(lobbies -> {
-                    Optional<Lobby> match = selectBest(lobbies, command.playerId(), player);
-
-                    if (match.isPresent()) {
-                        String lobbyId = match.get().lobbyId();
-                        return joinLobbyUseCase
-                                .join(lobbyId, command.playerId(), LobbyParticipantType.HUMAN)
-                                .thenApply(_ -> lobbyId);
-                    }
-
-                    String lobbyId = UUID.randomUUID().toString();
-                    return openLobbyUseCase
-                            .open(new LobbyCommand.OpenLobbyCommand(lobbyId, command.playerId(), command.topicId()))
-                            .thenApply(_ -> lobbyId);
-                });
+                .thenCompose(lobbies -> joinOrOpen(lobbies, command, player, new HashSet<>()));
     }
 
     @Override
@@ -75,9 +71,49 @@ public class MatchmakingService implements MatchmakingUseCase {
         return cancelLobbyUseCase.cancel(command.ticketId(), command.playerId());
     }
 
-    private Optional<Lobby> selectBest(List<Lobby> lobbies, String playerId, PlayerSummary player) {
-        return lobbies.stream()
+    private CompletableFuture<String> joinOrOpen(List<Lobby> lobbies,
+                                                 MatchmakingCommand.EnqueuePlayerCommand command,
+                                                 PlayerSummary player,
+                                                 Set<String> excludedLobbies) {
+        Optional<Lobby> match = selectBest(lobbies, command.playerId(), player, excludedLobbies);
+        if (match.isEmpty() || excludedLobbies.size() >= MAX_JOIN_ATTEMPTS) {
+            return openNewLobby(command);
+        }
+
+        Lobby lobby = match.get();
+        return joinLobbyUseCase
+                .join(lobby.lobbyId(), command.playerId(), LobbyParticipantType.HUMAN)
+                .thenApply(_ -> lobby.lobbyId())
+                .exceptionallyCompose(error -> {
+                    if (isJoinRace(error)) {
+                        excludedLobbies.add(lobby.lobbyId());
+                        return joinOrOpen(lobbies, command, player, excludedLobbies);
+                    }
+                    return CompletableFuture.failedFuture(error);
+                });
+    }
+
+    private CompletableFuture<String> openNewLobby(MatchmakingCommand.EnqueuePlayerCommand command) {
+        String lobbyId = UUID.randomUUID().toString();
+        return openLobbyUseCase
+                .open(new LobbyCommand.OpenLobbyCommand(lobbyId, command.playerId(), command.topicId()))
+                .thenApply(_ -> lobbyId);
+    }
+
+    private Optional<Lobby> selectBest(List<Lobby> lobbies,
+                                       String playerId,
+                                       PlayerSummary player,
+                                       Set<String> excludedLobbies) {
+        List<Lobby> candidates = lobbies.stream()
                 .filter(lobby -> !playerId.equals(lobby.initiatorId()))
+                .filter(lobby -> !excludedLobbies.contains(lobby.lobbyId()))
+                .toList();
+
+        Set<String> onlineInitiators = matchmakingPlayerPort.filterOnline(
+                candidates.stream().map(Lobby::initiatorId).distinct().toList());
+
+        return candidates.stream()
+                .filter(lobby -> onlineInitiators.contains(lobby.initiatorId()))
                 .map(lobby -> Map.entry(lobby, matchmakingPlayerPort.getPlayer(lobby.initiatorId())))
                 .filter(entry -> Math.abs(entry.getValue().level() - player.level()) <= MatchmakingRules.LEVEL_WINDOW)
                 .sorted(Comparator
@@ -89,5 +125,19 @@ public class MatchmakingService implements MatchmakingUseCase {
                                 Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(Map.Entry::getKey)
                 .findFirst();
+    }
+
+    /** Course de join : le lobby a changé d'état entre la sélection et la commande. */
+    private static boolean isJoinRace(Throwable error) {
+        Throwable current = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+        while (current != null) {
+            if (current instanceof LobbyExceptions.LobbyNotAvailableProblem
+                    || current instanceof LobbyExceptions.LobbyAlreadyFullProblem
+                    || current instanceof LobbyExceptions.PlayerAlreadyInLobbyProblem) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

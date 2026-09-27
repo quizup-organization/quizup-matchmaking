@@ -39,23 +39,35 @@ exposée par le service.
 
 | Port out   | Service cible     | Query Axon envoyée (QueryGateway) |
 |------------|-------------------|-----------------------------------|
-| `ProfileRepositoryPort` | `quizup-profile` | `ProfileQuery.FindProfileQuery`   |
+| `ProfileRepositoryPort` | `quizup-profile` | `ProfileQuery.GetProfileQuery`   |
+| `MatchmakingPlayerPort` (présence) | `quizup-profile` | `PresenceQuery.GetPresencesByIdsQuery` |
 
-Implémentation : `application/service/UserService` (→ profile, `.map(Profile::displayName)`).
+Implémentation : `application/service/MatchmakingPlayerService` (→ profile/progression, nom + niveau + pays).
 
 **Ports sortants locaux** : `LobbyRepositoryPort`, `LobbyEventStorePort`.
 
-### File d'attente (`/api/matchmaking/queue`)
+### Contrat BFF (ticket)
 
-- `POST /api/matchmaking/queue` → met en file (ticket = lobby) ; `GET /{id}` ; `POST /{id}/cancel` → `200` (annule le lobby associé, transition d'état).
-- `MatchmakingService` (application) apparie par **sujet + niveau ±5 + préférence pays**, via
-  `MatchmakingPlayerPort` (profil + progression). S'il n'y a pas d'adversaire compatible, un
-  lobby est ouvert ; `LobbySaga` gère le **fallback bot** après expiration.
-- Notifications live sur `/topic/lobbies/{ticketId}` (réutilise `LobbyNotificationService`).
+- `POST /api/matchmaking/tickets` (file d'attente) ; `GET /{ticketId}` ;
+  `POST /{ticketId}/cancel` ; `GET /{ticketId}/notifications`.
+- **Read model ticket dédié** (`matchmaking_ticket_entry`, projection
+  `matchmaking-ticket-projection`) : statuts produit explicites `SEARCHING|MATCHED|CANCELLED`,
+  alimenté par les événements de lobby. `GET /{ticketId}` lit ce ticket (le BFF n'interprète plus
+  `LobbyStatus`). Le service expose son event store en **`EventEnvelope`** SDK
+  (`GetLobbyEventsQuery`, payload `LobbyEvent` typé) ; c'est le BFF qui mappe vers les notifications
+  web (`TicketNotification`, `LobbyJoinedEvent` non exposé) et les pousse sur
+  `/topic/matchmaking/tickets/{ticketId}`.
+- `MatchmakingService` apparie par **sujet + niveau ±5 + préférence pays + présence** (via
+  `MatchmakingPlayerPort.filterOnline`, requête `PresenceQuery.GetPresencesByIdsQuery`) : on ne
+  rejoint jamais un lobby dont l'initiateur est hors ligne. Les courses de join (lobby annulé ou
+  rempli entre la sélection et la commande) sont rejouées sur le candidat suivant (borné).
+- **Fallback bot automatique** (pas de queue infinie) : à l'échéance de 10 s sans adversaire, la
+  `LobbySaga` injecte le bot si l'initiateur est toujours en ligne, sinon elle **annule** le lobby
+  (initiateur parti) au lieu de créer une partie fantôme.
+- Les queries `SearchLobbyQuery` restent disponibles pour les **futures surfaces d'administration**.
 
 Le second joueur compatible rejoint le lobby du premier (les deux tickets pointent donc le
-**même** `lobbyId`). **`LobbyProjection` conserve les lobbies `COMPLETED`/`CANCELLED`** (statut +
-`gameId`) : le client lit le `gameId` via `GET /api/matchmaking/queue/{ticketId}` (statut `MATCHED`).
+**même** `lobbyId`). Le read model ticket reste lisible après fermeture (jusqu'à la purge).
 
 **Purge event-driven** (pas de scheduler JPA) : `LobbySaga`, à réception de
 `LobbyCompletedEvent`/`LobbyCancelledEvent`, planifie un deadline `LOBBY_PURGE`
@@ -63,7 +75,4 @@ Le second joueur compatible rejoint le lobby du premier (les deux tickets pointe
 → `LobbyPurgedEvent` → l'agrégat `markDeleted()` (flux supprimé côté event store logique) et
 `LobbyProjection` supprime sa ligne (`deleteById`). La saga se termine sur `LobbyPurgedEvent`.
 Les deadlines sont annulés de façon ciblée (`cancelSchedule(name, scheduleId)`, id conservé).
-
-Conséquence : `POST /api/lobbies/search` renvoie aussi les lobbies fermés (jusqu'à purge) →
-filtrer `status=OPEN`.
 

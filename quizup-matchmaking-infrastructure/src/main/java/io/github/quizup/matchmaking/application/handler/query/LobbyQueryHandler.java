@@ -1,9 +1,8 @@
 package io.github.quizup.matchmaking.application.handler.query;
 
-import io.github.quizup.microservice.core.domain.model.notification.NotificationEnvelope;
+import io.github.quizup.microservice.core.domain.model.notification.EventEnvelope;
 import io.github.quizup.microservice.core.infrastructure.in.api.response.SearchResponse;
 import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
-import io.github.quizup.matchmaking.domain.event.LobbyEvent;
 import io.github.quizup.matchmaking.domain.model.Lobby;
 import io.github.quizup.matchmaking.domain.port.out.LobbyEventStorePort;
 import io.github.quizup.matchmaking.domain.port.out.LobbyRepositoryPort;
@@ -56,8 +55,7 @@ public class LobbyQueryHandler {
     }
 
     @QueryHandler
-    public List<NotificationEnvelope<LobbyEvent>> handle(LobbyQuery.GetLobbyEventsQuery query) {
-        logger.info("GetLobbyEvents: lobbyId={}", query.lobbyId());
+    public List<EventEnvelope> handle(LobbyQuery.GetLobbyEventsQuery query) {
         return lobbyEventStorePort.findEventEnvelopesByLobbyId(query.lobbyId());
     }
 

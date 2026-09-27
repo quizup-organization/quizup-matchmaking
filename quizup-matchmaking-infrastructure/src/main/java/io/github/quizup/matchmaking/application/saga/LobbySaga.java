@@ -9,6 +9,7 @@ import io.github.quizup.matchmaking.domain.model.LobbyDeadline;
 import io.github.quizup.matchmaking.domain.model.LobbyParticipantType;
 import io.github.quizup.matchmaking.domain.model.LobbyPlayer;
 import io.github.quizup.matchmaking.domain.model.LobbyPolicy;
+import io.github.quizup.matchmaking.domain.port.out.MatchmakingPlayerPort;
 import io.github.quizup.matchmaking.domain.port.out.ProfileRepositoryPort;
 import lombok.Getter;
 import lombok.Setter;
@@ -56,6 +57,9 @@ public class LobbySaga {
 
     @Autowired
     private transient ProfileRepositoryPort profileRepositoryPort;
+
+    @Autowired
+    private transient MatchmakingPlayerPort matchmakingPlayerPort;
 
     @Getter
     @Setter
@@ -137,7 +141,15 @@ public class LobbySaga {
 
     @DeadlineHandler(deadlineName = LobbyDeadline.MATCHMAKING_DEADLINE)
     public void onMatchmakingTimeout() {
-        if (LobbyPolicy.shouldFallbackToBot(challengerId)) {
+        boolean initiatorOnline = matchmakingPlayerPort.isOnline(initiatorId);
+
+        if (LobbyPolicy.shouldCancelOffline(challengerId, initiatorOnline)) {
+            logger.info("Timeout matchmaking — initiateur hors ligne, annulation du lobby: lobbyId={}", lobbyId);
+            commandGateway.send(new LobbyCommand.CancelLobbyCommand(lobbyId, initiatorId));
+            return;
+        }
+
+        if (LobbyPolicy.shouldFallbackToBot(challengerId, initiatorOnline)) {
             logger.info("Timeout matchmaking — injection bot: lobbyId={}", lobbyId);
             commandGateway.send(new LobbyCommand.JoinLobbyCommand(lobbyId, LobbyPolicy.BOT_PLAYER_ID, LobbyParticipantType.BOT));
         }

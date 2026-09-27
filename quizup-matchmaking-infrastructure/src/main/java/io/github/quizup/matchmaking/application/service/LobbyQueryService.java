@@ -1,9 +1,8 @@
 package io.github.quizup.matchmaking.application.service;
 
 import io.github.quizup.microservice.core.infrastructure.axon.QueryResponseTypes;
-import io.github.quizup.microservice.core.domain.model.notification.NotificationEnvelope;
+import io.github.quizup.microservice.core.domain.model.notification.EventEnvelope;
 import io.github.quizup.microservice.core.infrastructure.in.api.response.SearchResponse;
-import io.github.quizup.matchmaking.domain.event.LobbyEvent;
 import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
 import io.github.quizup.matchmaking.domain.model.Lobby;
 import io.github.quizup.matchmaking.domain.port.in.GetLobbyEventsUseCase;
@@ -37,11 +36,10 @@ public class LobbyQueryService implements GetLobbyUseCase, GetOpenLobbiesByTopic
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public CompletableFuture<List<NotificationEnvelope<LobbyEvent>>> getEvents(LobbyQuery.GetLobbyEventsQuery query) {
-        return queryGateway
-                .query(query, QueryResponseTypes.multipleInstancesOf(NotificationEnvelope.class))
-                .thenApply(result -> (List<NotificationEnvelope<LobbyEvent>>) (List<?>) result);
+    public CompletableFuture<List<EventEnvelope>> getEvents(LobbyQuery.GetLobbyEventsQuery query) {
+        return queryGateway.query(
+                query,
+                QueryResponseTypes.multipleInstancesOf(EventEnvelope.class));
     }
 
     @Override
