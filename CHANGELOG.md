@@ -1,3 +1,13 @@
+## [3.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v2.1.0...v3.0.0) (2026-09-30)
+
+### ⚠ BREAKING CHANGES
+
+* **matchmaking:** LobbyPlayer/PlayerSummary carry the player language; enqueue rejects topics unavailable in the player language; pairing requires the topic to cover both languages; LobbySaga forwards required languages to CreateGameCommand (pins SDK 4.1.0, profile 3.0.0, game 4.0.0, theme 4.0.0).
+
+### Features
+
+* **matchmaking:** language-aware pairing and ticket availability guards ([67bfa7d](https://github.com/quizup-organization/quizup-matchmaking/commit/67bfa7d79d678391b7cd86b37720cf4db15b86e0))
+
 ## [2.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v2.0.0...v2.1.0) (2026-09-27)
 
 ### Features
