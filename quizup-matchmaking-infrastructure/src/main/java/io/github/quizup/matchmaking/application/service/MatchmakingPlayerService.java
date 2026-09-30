@@ -1,5 +1,6 @@
 package io.github.quizup.matchmaking.application.service;
 
+import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import io.github.quizup.microservice.core.infrastructure.axon.QueryResponseTypes;
 import io.github.quizup.matchmaking.domain.model.PlayerSummary;
 import io.github.quizup.matchmaking.domain.port.out.MatchmakingPlayerPort;
@@ -37,8 +38,9 @@ public class MatchmakingPlayerService implements MatchmakingPlayerPort {
 
     @Override
     public PlayerSummary getPlayer(String userId) {
-        String displayName = null;
+        String pseudonym = null;
         String country = null;
+        Language language = null;
         int level = 1;
 
         try {
@@ -46,8 +48,9 @@ public class MatchmakingPlayerService implements MatchmakingPlayerPort {
                     new ProfileQuery.GetProfileQuery(userId),
                     QueryResponseTypes.instanceOf(Profile.class)
             ).join();
-            displayName = profile.displayName();
+            pseudonym = profile.pseudonym();
             country = profile.country();
+            language = profile.language();
         } catch (Exception exception) {
             logger.warn("Profil introuvable pour {} : {}", userId, exception.getMessage());
         }
@@ -62,7 +65,7 @@ public class MatchmakingPlayerService implements MatchmakingPlayerPort {
             logger.warn("Progression introuvable pour {} : {}", userId, exception.getMessage());
         }
 
-        return new PlayerSummary(userId, displayName, level, country);
+        return new PlayerSummary(userId, pseudonym, level, country, language);
     }
 
     @Override

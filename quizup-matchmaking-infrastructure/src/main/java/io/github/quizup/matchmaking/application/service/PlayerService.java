@@ -23,6 +23,6 @@ public class PlayerService implements ProfileRepositoryPort {
                 new ProfileQuery.GetProfileQuery(identifier),
                 QueryResponseTypes.instanceOf(Profile.class)
         ).join();
-        return new LobbyPlayer(profile.userId(), profile.email(), profile.displayName());
+        return new LobbyPlayer(profile.userId(), profile.email(), profile.pseudonym(), profile.language());
     }
 }

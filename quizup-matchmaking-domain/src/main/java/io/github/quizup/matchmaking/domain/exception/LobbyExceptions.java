@@ -1,10 +1,25 @@
 package io.github.quizup.matchmaking.domain.exception;
 
 import io.github.quizup.microservice.core.domain.exception.ProblemCategory;
+import io.github.quizup.microservice.core.domain.model.i18n.Language;
+
+import java.util.Map;
+import java.util.Set;
 
 public final class LobbyExceptions {
 
     private LobbyExceptions() {}
+
+    public static class TopicNotAvailableInLanguageProblem extends LobbyProblem {
+        public TopicNotAvailableInLanguageProblem(String topicId, Set<Language> languages) {
+            super(topicId, "urn:quizup:lobby:topicNotAvailableInLanguage",
+                    ProblemCategory.BUSINESS_INVALID_COMMAND,
+                    "Thème non disponible dans cette langue",
+                    "Le thème " + topicId + " n'a pas assez de questions dans " + languages,
+                    Map.of("topicId", topicId,
+                            "languages", languages.stream().map(Language::code).toList()));
+        }
+    }
 
     public static class LobbyNotFoundProblem extends LobbyProblem {
         public LobbyNotFoundProblem(String lobbyId) {

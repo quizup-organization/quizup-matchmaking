@@ -11,6 +11,8 @@ import io.github.quizup.matchmaking.domain.model.LobbyPlayer;
 import io.github.quizup.matchmaking.domain.model.LobbyPolicy;
 import io.github.quizup.matchmaking.domain.port.out.MatchmakingPlayerPort;
 import io.github.quizup.matchmaking.domain.port.out.ProfileRepositoryPort;
+import io.github.quizup.matchmaking.domain.port.out.TopicAvailabilityPort;
+import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import lombok.Getter;
 import lombok.Setter;
 import org.axonframework.commandhandling.gateway.CommandGateway;
@@ -26,6 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -60,6 +64,9 @@ public class LobbySaga {
 
     @Autowired
     private transient MatchmakingPlayerPort matchmakingPlayerPort;
+
+    @Autowired
+    private transient TopicAvailabilityPort topicAvailabilityPort;
 
     @Getter
     @Setter
@@ -121,6 +128,11 @@ public class LobbySaga {
 
         GamePlayerType gamePlayerType = toGamePlayerType(event.challengerType());
 
+        // Le bot n'impose pas sa langue : seul l'initiateur doit disposer de sa version.
+        Set<Language> languages = event.challengerType() == LobbyParticipantType.BOT
+                ? languagesOf(initiatorProfile)
+                : languagesOf(initiatorProfile, challengerProfile);
+
         commandGateway.send(new GameCommand.CreateGameCommand(
                 gameId,
                 topicId,
@@ -129,6 +141,7 @@ public class LobbySaga {
                 challengerProfile.playerId(),
                 challengerProfile.playerName(),
                 GameMode.SYNC,
+                languages,
                 gamePlayerType,
                 null,
                 null
@@ -150,9 +163,27 @@ public class LobbySaga {
         }
 
         if (LobbyPolicy.shouldFallbackToBot(challengerId, initiatorOnline)) {
+            Set<Language> initiatorLanguages = languagesOf(initiatorProfile);
+            if (!topicAvailabilityPort.coversAllLanguages(topicId, initiatorLanguages)) {
+                logger.info("Timeout matchmaking — thème indisponible dans la langue de l'initiateur, annulation: lobbyId={}", lobbyId);
+                commandGateway.send(new LobbyCommand.CancelLobbyCommand(lobbyId, initiatorId));
+                return;
+            }
+
             logger.info("Timeout matchmaking — injection bot: lobbyId={}", lobbyId);
             commandGateway.send(new LobbyCommand.JoinLobbyCommand(lobbyId, LobbyPolicy.BOT_PLAYER_ID, LobbyParticipantType.BOT));
         }
+    }
+
+    /** Langues non nulles des joueurs fournis (union). */
+    private static Set<Language> languagesOf(LobbyPlayer... players) {
+        Set<Language> languages = new HashSet<>();
+        for (LobbyPlayer player : players) {
+            if (player != null && player.language() != null) {
+                languages.add(player.language());
+            }
+        }
+        return languages;
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")

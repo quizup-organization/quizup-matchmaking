@@ -1,13 +1,16 @@
 package io.github.quizup.matchmaking.domain.model;
 
+import io.github.quizup.microservice.core.domain.model.i18n.Language;
+
 /**
- * Résumé d'un joueur pour le matchmaking (nom, niveau, pays) — type local au
- * module, résolu auprès de quizup-profile / quizup-profile (progression).
+ * Résumé d'un joueur pour le matchmaking (pseudonyme, niveau, pays, langue) — type local au
+ * module, résolu auprès de quizup-profile (profil + progression).
  */
 public record PlayerSummary(
         String userId,
-        String displayName,
+        String pseudonym,
         int level,
-        String country
+        String country,
+        Language language
 ) {
 }

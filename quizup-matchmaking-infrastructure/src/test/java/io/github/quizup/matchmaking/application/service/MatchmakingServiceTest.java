@@ -12,6 +12,8 @@ import io.github.quizup.matchmaking.domain.port.in.GetOpenLobbiesByTopicUseCase;
 import io.github.quizup.matchmaking.domain.port.in.JoinLobbyUseCase;
 import io.github.quizup.matchmaking.domain.port.in.OpenLobbyUseCase;
 import io.github.quizup.matchmaking.domain.port.out.MatchmakingPlayerPort;
+import io.github.quizup.matchmaking.domain.port.out.TopicAvailabilityPort;
+import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -21,7 +23,9 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -38,15 +42,27 @@ class MatchmakingServiceTest {
     private final JoinLobbyUseCase joinLobby = mock(JoinLobbyUseCase.class);
     private final CancelLobbyUseCase cancelLobby = mock(CancelLobbyUseCase.class);
     private final MatchmakingPlayerPort playerPort = mock(MatchmakingPlayerPort.class);
+    private final TopicAvailabilityPort topicAvailabilityPort = mock(TopicAvailabilityPort.class);
 
     private final MatchmakingService service = new MatchmakingService(
-            getOpenLobbies, openLobby, joinLobby, cancelLobby, playerPort);
+            getOpenLobbies, openLobby, joinLobby, cancelLobby, playerPort, topicAvailabilityPort);
 
     @BeforeEach
     void setUp() {
-        when(playerPort.getPlayer(PLAYER)).thenReturn(new PlayerSummary(PLAYER, "Moi", 10, "FR"));
+        when(playerPort.getPlayer(PLAYER)).thenReturn(new PlayerSummary(PLAYER, "Moi", 10, "FR", Language.FR));
+        when(topicAvailabilityPort.coversAllLanguages(anyString(), anySet())).thenReturn(true);
         when(openLobby.open(any(LobbyCommand.OpenLobbyCommand.class)))
                 .thenReturn(CompletableFuture.completedFuture("opened"));
+    }
+
+    @Test
+    void enqueue_rejectsTopicUnavailableInPlayerLanguage() {
+        when(topicAvailabilityPort.coversAllLanguages(TOPIC, Set.of(Language.FR))).thenReturn(false);
+
+        assertThatThrownBy(() -> service.enqueue(PLAYER, TOPIC))
+                .isInstanceOf(LobbyExceptions.TopicNotAvailableInLanguageProblem.class);
+
+        verify(openLobby, never()).open(any(LobbyCommand.OpenLobbyCommand.class));
     }
 
     @Test
@@ -77,7 +93,7 @@ class MatchmakingServiceTest {
         Lobby lobby = lobby("lobby-1", "initiator-1");
         when(getOpenLobbies.getOpenByTopicId(TOPIC)).thenReturn(CompletableFuture.completedFuture(List.of(lobby)));
         when(playerPort.filterOnline(any())).thenReturn(Set.of("initiator-1"));
-        when(playerPort.getPlayer("initiator-1")).thenReturn(new PlayerSummary("initiator-1", "Adv", 12, "FR"));
+        when(playerPort.getPlayer("initiator-1")).thenReturn(new PlayerSummary("initiator-1", "Adv", 12, "FR", Language.FR));
         when(joinLobby.join("lobby-1", PLAYER, LobbyParticipantType.HUMAN))
                 .thenReturn(CompletableFuture.completedFuture(null));
 
@@ -93,8 +109,8 @@ class MatchmakingServiceTest {
         Lobby second = lobby("lobby-2", "initiator-2");
         when(getOpenLobbies.getOpenByTopicId(TOPIC)).thenReturn(CompletableFuture.completedFuture(List.of(first, second)));
         when(playerPort.filterOnline(any())).thenReturn(Set.of("initiator-1", "initiator-2"));
-        when(playerPort.getPlayer("initiator-1")).thenReturn(new PlayerSummary("initiator-1", "A", 10, "FR"));
-        when(playerPort.getPlayer("initiator-2")).thenReturn(new PlayerSummary("initiator-2", "B", 14, "FR"));
+        when(playerPort.getPlayer("initiator-1")).thenReturn(new PlayerSummary("initiator-1", "A", 10, "FR", Language.FR));
+        when(playerPort.getPlayer("initiator-2")).thenReturn(new PlayerSummary("initiator-2", "B", 14, "FR", Language.FR));
         when(joinLobby.join("lobby-1", PLAYER, LobbyParticipantType.HUMAN))
                 .thenReturn(CompletableFuture.failedFuture(new LobbyExceptions.LobbyNotAvailableProblem("lobby-1")));
         when(joinLobby.join("lobby-2", PLAYER, LobbyParticipantType.HUMAN))

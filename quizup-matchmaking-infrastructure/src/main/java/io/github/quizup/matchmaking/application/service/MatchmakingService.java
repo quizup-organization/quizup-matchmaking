@@ -13,6 +13,8 @@ import io.github.quizup.matchmaking.domain.port.in.JoinLobbyUseCase;
 import io.github.quizup.matchmaking.domain.port.in.MatchmakingUseCase;
 import io.github.quizup.matchmaking.domain.port.in.OpenLobbyUseCase;
 import io.github.quizup.matchmaking.domain.port.out.MatchmakingPlayerPort;
+import io.github.quizup.matchmaking.domain.port.out.TopicAvailabilityPort;
+import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -28,9 +30,11 @@ import java.util.concurrent.CompletionException;
 
 /**
  * Service applicatif de la file d'attente : appariement par sujet, niveau (±5), préférence pays,
- * **et présence** (on ne rejoint jamais un lobby dont l'initiateur est hors ligne). Si aucun
- * adversaire compatible n'est trouvé, un lobby est ouvert — la {@code LobbySaga} gère le fallback
- * bot automatique après expiration, ou annule si l'initiateur a disparu.
+ * **présence** (on ne rejoint jamais un lobby dont l'initiateur est hors ligne) et
+ * **compatibilité linguistique** (le thème doit couvrir les langues des deux joueurs — sélection
+ * stricte côté game). Si aucun adversaire compatible n'est trouvé, un lobby est ouvert — la
+ * {@code LobbySaga} gère le fallback bot automatique après expiration, ou annule si l'initiateur
+ * a disparu.
  *
  * <p>Race de join : entre la sélection et l'envoi de la commande, un lobby peut être annulé ou
  * rempli ; la commande est alors rejouée sur le candidat suivant (borné).</p>
@@ -45,22 +49,30 @@ public class MatchmakingService implements MatchmakingUseCase {
     private final JoinLobbyUseCase joinLobbyUseCase;
     private final CancelLobbyUseCase cancelLobbyUseCase;
     private final MatchmakingPlayerPort matchmakingPlayerPort;
+    private final TopicAvailabilityPort topicAvailabilityPort;
 
     public MatchmakingService(GetOpenLobbiesByTopicUseCase getOpenLobbiesByTopicUseCase,
                               OpenLobbyUseCase openLobbyUseCase,
                               JoinLobbyUseCase joinLobbyUseCase,
                               CancelLobbyUseCase cancelLobbyUseCase,
-                              MatchmakingPlayerPort matchmakingPlayerPort) {
+                              MatchmakingPlayerPort matchmakingPlayerPort,
+                              TopicAvailabilityPort topicAvailabilityPort) {
         this.getOpenLobbiesByTopicUseCase = getOpenLobbiesByTopicUseCase;
         this.openLobbyUseCase = openLobbyUseCase;
         this.joinLobbyUseCase = joinLobbyUseCase;
         this.cancelLobbyUseCase = cancelLobbyUseCase;
         this.matchmakingPlayerPort = matchmakingPlayerPort;
+        this.topicAvailabilityPort = topicAvailabilityPort;
     }
 
     @Override
     public CompletableFuture<String> enqueue(MatchmakingCommand.EnqueuePlayerCommand command) {
         PlayerSummary player = matchmakingPlayerPort.getPlayer(command.playerId());
+
+        Set<Language> playerLanguages = languagesOf(player);
+        if (!topicAvailabilityPort.coversAllLanguages(command.topicId(), playerLanguages)) {
+            throw new LobbyExceptions.TopicNotAvailableInLanguageProblem(command.topicId(), playerLanguages);
+        }
 
         return getOpenLobbiesByTopicUseCase.getOpenByTopicId(command.topicId())
                 .thenCompose(lobbies -> joinOrOpen(lobbies, command, player, new HashSet<>()));
@@ -75,7 +87,7 @@ public class MatchmakingService implements MatchmakingUseCase {
                                                  MatchmakingCommand.EnqueuePlayerCommand command,
                                                  PlayerSummary player,
                                                  Set<String> excludedLobbies) {
-        Optional<Lobby> match = selectBest(lobbies, command.playerId(), player, excludedLobbies);
+        Optional<Lobby> match = selectBest(lobbies, command.topicId(), command.playerId(), player, excludedLobbies);
         if (match.isEmpty() || excludedLobbies.size() >= MAX_JOIN_ATTEMPTS) {
             return openNewLobby(command);
         }
@@ -101,6 +113,7 @@ public class MatchmakingService implements MatchmakingUseCase {
     }
 
     private Optional<Lobby> selectBest(List<Lobby> lobbies,
+                                       String topicId,
                                        String playerId,
                                        PlayerSummary player,
                                        Set<String> excludedLobbies) {
@@ -116,6 +129,8 @@ public class MatchmakingService implements MatchmakingUseCase {
                 .filter(lobby -> onlineInitiators.contains(lobby.initiatorId()))
                 .map(lobby -> Map.entry(lobby, matchmakingPlayerPort.getPlayer(lobby.initiatorId())))
                 .filter(entry -> Math.abs(entry.getValue().level() - player.level()) <= MatchmakingRules.LEVEL_WINDOW)
+                .filter(entry -> topicAvailabilityPort.coversAllLanguages(
+                        topicId, languagesOf(entry.getValue(), player)))
                 .sorted(Comparator
                         .comparing((Map.Entry<Lobby, PlayerSummary> entry) ->
                                 !Objects.equals(entry.getValue().country(), player.country()))
@@ -125,6 +140,17 @@ public class MatchmakingService implements MatchmakingUseCase {
                                 Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(Map.Entry::getKey)
                 .findFirst();
+    }
+
+    /** Langues non nulles des joueurs fournis (union). */
+    private static Set<Language> languagesOf(PlayerSummary... players) {
+        Set<Language> languages = new HashSet<>();
+        for (PlayerSummary player : players) {
+            if (player.language() != null) {
+                languages.add(player.language());
+            }
+        }
+        return languages;
     }
 
     /** Course de join : le lobby a changé d'état entre la sélection et la commande. */
