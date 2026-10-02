@@ -1,3 +1,13 @@
+## [4.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v3.0.0...v4.0.0) (2026-10-02)
+
+### ⚠ BREAKING CHANGES
+
+* **matchmaking:** public matchmaking aggregate + private lobby
+
+### Code Refactoring
+
+* **matchmaking:** public matchmaking aggregate + private lobby ([df83de2](https://github.com/quizup-organization/quizup-matchmaking/commit/df83de2bc644fae6041a79456e3af651eefebeba))
+
 ## [3.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v2.1.0...v3.0.0) (2026-09-30)
 
 ### ⚠ BREAKING CHANGES
