@@ -1,7 +1,6 @@
 package io.github.quizup.matchmaking.application.projection;
 
 import io.github.quizup.matchmaking.domain.event.LobbyEvent;
-import io.github.quizup.matchmaking.domain.model.LobbyParticipantType;
 import io.github.quizup.matchmaking.domain.model.Lobby;
 import io.github.quizup.matchmaking.domain.model.LobbyStatus;
 import io.github.quizup.matchmaking.domain.port.out.LobbyRepositoryPort;
@@ -11,12 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Projection read-only des lobbies.
- * <p>
- * Les lobbies fermés ne sont **pas supprimés** immédiatement : le ticket de matchmaking
- * (`GET /api/matchmaking/queue/{ticketId}`) doit rester lisible pour exposer le `gameId`
- * au client. La purge (agrégat + ligne de projection) survient après rétention, via
- * {@code LobbyPurgedEvent} (piloté par la {@code LobbySaga}).
+ * Projection read-only du salon privé. La réussite purge la ligne immédiatement ; les états
+ * terminaux (annulé/expiré/échoué) sont conservés le temps de la rétention avant purge.
  */
 @Component
 @ProcessingGroup("lobby-projection")
@@ -30,60 +25,58 @@ public class LobbyProjection {
 
     @EventHandler
     @Transactional
-    public void on(LobbyEvent.LobbyOpenedEvent event) {
-        lobbyRepositoryPort.save(
-                Lobby.builder()
-                        .lobbyId(event.lobbyId())
-                        .topicId(event.topicId())
-                        .initiatorId(event.initiatorId())
-                        .status(LobbyStatus.OPEN)
-                        .createdAt(event.openedAt())
-                        .updatedAt(event.openedAt())
-                        .build()
-        );
+    public void on(LobbyEvent.LobbyCreatedEvent event) {
+        lobbyRepositoryPort.save(Lobby.builder()
+                .lobbyId(event.lobbyId())
+                .topicId(event.topicId())
+                .initiatorId(event.initiatorId())
+                .status(LobbyStatus.OPEN)
+                .createdAt(event.createdAt())
+                .expiresAt(event.expiresAt())
+                .updatedAt(event.createdAt())
+                .build());
     }
 
     @EventHandler
     @Transactional
     public void on(LobbyEvent.LobbyJoinedEvent event) {
-        lobbyRepositoryPort.findById(event.lobbyId()).ifPresent(lobby ->
-                lobbyRepositoryPort.save(
-                        lobby.toBuilder()
-                                .challengerId(event.challengerId())
-                                .vsBot(LobbyParticipantType.BOT.equals(event.challengerType()))
-                                .updatedAt(event.joinedAt())
-                                .build()
-                )
-        );
+        update(event.lobbyId(), lobby -> lobby.toBuilder()
+                .participantId(event.participantId())
+                .updatedAt(event.joinedAt())
+                .build());
     }
 
     @EventHandler
     @Transactional
     public void on(LobbyEvent.LobbyCancelledEvent event) {
-        lobbyRepositoryPort.findById(event.lobbyId()).ifPresent(lobby ->
-                lobbyRepositoryPort.save(
-                        lobby.toBuilder()
-                                .status(LobbyStatus.CANCELLED)
-                                .updatedAt(event.cancelledAt())
-                                .build()
-                )
-        );
+        update(event.lobbyId(), lobby -> lobby.toBuilder()
+                .status(LobbyStatus.CANCELLED)
+                .updatedAt(event.cancelledAt())
+                .build());
+    }
+
+    @EventHandler
+    @Transactional
+    public void on(LobbyEvent.LobbyExpiredEvent event) {
+        update(event.lobbyId(), lobby -> lobby.toBuilder()
+                .status(LobbyStatus.EXPIRED)
+                .updatedAt(event.expiredAt())
+                .build());
+    }
+
+    @EventHandler
+    @Transactional
+    public void on(LobbyEvent.LobbyFailedEvent event) {
+        update(event.lobbyId(), lobby -> lobby.toBuilder()
+                .status(LobbyStatus.FAILED)
+                .updatedAt(event.failedAt())
+                .build());
     }
 
     @EventHandler
     @Transactional
     public void on(LobbyEvent.LobbyCompletedEvent event) {
-        lobbyRepositoryPort.findById(event.lobbyId()).ifPresent(lobby ->
-                lobbyRepositoryPort.save(
-                        lobby.toBuilder()
-                                .challengerId(event.challengerId())
-                                .gameId(event.gameId())
-                                .vsBot(event.vsBot())
-                                .status(LobbyStatus.COMPLETED)
-                                .updatedAt(event.closedAt())
-                                .build()
-                )
-        );
+        lobbyRepositoryPort.deleteById(event.lobbyId());
     }
 
     @EventHandler
@@ -92,4 +85,8 @@ public class LobbyProjection {
         lobbyRepositoryPort.deleteById(event.lobbyId());
     }
 
+    private void update(String lobbyId, java.util.function.UnaryOperator<Lobby> transform) {
+        lobbyRepositoryPort.findById(lobbyId).ifPresent(lobby ->
+                lobbyRepositoryPort.save(transform.apply(lobby)));
+    }
 }

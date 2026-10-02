@@ -1,22 +1,47 @@
 package io.github.quizup.matchmaking.domain.command;
 
+import io.github.quizup.microservice.core.domain.model.i18n.Language;
+import org.axonframework.modelling.command.TargetAggregateIdentifier;
+
+import java.util.Set;
+
+/**
+ * Commandes de la recherche d'appariement public (duel « Défier le monde »).
+ */
 public interface MatchmakingCommand {
 
-    /**
-     * Met un joueur en file d'attente pour un sujet.
-     */
-    record EnqueuePlayerCommand(
+    String matchmakingId();
+
+    /** Démarre une recherche pour un sujet. */
+    record CreateMatchmakingCommand(
+            @TargetAggregateIdentifier String matchmakingId,
             String playerId,
-            String topicId
+            String topicId,
+            int level,
+            Set<Language> languages
     ) implements MatchmakingCommand {
     }
 
-    /**
-     * Annule la recherche d'un joueur (ticket = lobby).
-     */
+    /** Annule une recherche (action du joueur). */
     record CancelMatchmakingCommand(
-            String playerId,
-            String ticketId
+            @TargetAggregateIdentifier String matchmakingId,
+            String playerId
+    ) implements MatchmakingCommand {
+    }
+
+    /** Commande interne (saga) : la recherche a abouti (adversaire humain ou bot). */
+    record MarkMatchmakingMatchedCommand(
+            @TargetAggregateIdentifier String matchmakingId,
+            String opponentId,
+            String gameId,
+            boolean vsBot
+    ) implements MatchmakingCommand {
+    }
+
+    /** Commande interne (saga) : la partie n'a pas pu être créée. */
+    record FailMatchmakingCommand(
+            @TargetAggregateIdentifier String matchmakingId,
+            String reason
     ) implements MatchmakingCommand {
     }
 }

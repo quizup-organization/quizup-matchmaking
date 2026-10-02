@@ -1,15 +1,10 @@
 package io.github.quizup.matchmaking.application.service;
 
-import io.github.quizup.microservice.core.infrastructure.axon.QueryResponseTypes;
-import io.github.quizup.microservice.core.domain.model.notification.EventEnvelope;
-import io.github.quizup.microservice.core.infrastructure.in.api.response.SearchResponse;
-import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
 import io.github.quizup.matchmaking.domain.model.Lobby;
-import io.github.quizup.matchmaking.domain.port.in.GetLobbyEventsUseCase;
 import io.github.quizup.matchmaking.domain.port.in.GetLobbyUseCase;
-import io.github.quizup.matchmaking.domain.port.in.GetOpenLobbiesByTopicUseCase;
-import io.github.quizup.matchmaking.domain.port.in.SearchLobbyUseCase;
 import io.github.quizup.matchmaking.domain.query.LobbyQuery;
+import io.github.quizup.microservice.core.domain.model.notification.EventEnvelope;
+import io.github.quizup.microservice.core.infrastructure.axon.QueryResponseTypes;
 import org.axonframework.queryhandling.QueryGateway;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +12,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Service
-public class LobbyQueryService implements GetLobbyUseCase, GetOpenLobbiesByTopicUseCase, GetLobbyEventsUseCase, SearchLobbyUseCase {
+public class LobbyQueryService implements GetLobbyUseCase {
 
     private final QueryGateway queryGateway;
 
@@ -26,25 +21,17 @@ public class LobbyQueryService implements GetLobbyUseCase, GetOpenLobbiesByTopic
     }
 
     @Override
-    public CompletableFuture<Lobby> getById(LobbyQuery.GetLobbyById query) throws LobbyExceptions.LobbyNotFoundProblem {
+    public CompletableFuture<Lobby> getById(LobbyQuery.GetLobbyById query) {
         return queryGateway.query(query, QueryResponseTypes.instanceOf(Lobby.class));
     }
 
     @Override
-    public CompletableFuture<List<Lobby>> getOpenByTopicId(LobbyQuery.FindOpenLobbiesByTopicId query) {
+    public CompletableFuture<List<Lobby>> getMyOpen(LobbyQuery.GetMyOpenLobbies query) {
         return queryGateway.query(query, QueryResponseTypes.multipleInstancesOf(Lobby.class));
     }
 
     @Override
     public CompletableFuture<List<EventEnvelope>> getEvents(LobbyQuery.GetLobbyEventsQuery query) {
-        return queryGateway.query(
-                query,
-                QueryResponseTypes.multipleInstancesOf(EventEnvelope.class));
-    }
-
-    @Override
-    public CompletableFuture<SearchResponse<Lobby>> search(LobbyQuery.SearchLobbyQuery query) {
-        return queryGateway.query(query, QueryResponseTypes.searchResponseOf(Lobby.class));
+        return queryGateway.query(query, QueryResponseTypes.multipleInstancesOf(EventEnvelope.class));
     }
 }
-

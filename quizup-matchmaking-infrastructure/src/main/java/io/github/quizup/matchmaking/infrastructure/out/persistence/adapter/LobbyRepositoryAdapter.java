@@ -1,13 +1,8 @@
 package io.github.quizup.matchmaking.infrastructure.out.persistence.adapter;
 
-import io.github.quizup.microservice.core.infrastructure.in.api.request.SearchRequest;
-import io.github.quizup.microservice.core.infrastructure.in.api.response.SearchResponse;
-import io.github.quizup.microservice.core.infrastructure.adapter.AnnotationSearchableEntity;
-import io.github.quizup.microservice.core.infrastructure.adapter.JpaSearchAdapter;
 import io.github.quizup.matchmaking.domain.model.Lobby;
 import io.github.quizup.matchmaking.domain.model.LobbyStatus;
 import io.github.quizup.matchmaking.domain.port.out.LobbyRepositoryPort;
-import io.github.quizup.matchmaking.infrastructure.out.persistence.entity.LobbyEntity;
 import io.github.quizup.matchmaking.infrastructure.out.persistence.mapper.LobbyEntityMapper;
 import io.github.quizup.matchmaking.infrastructure.out.persistence.repository.LobbyJpaRepository;
 import org.springframework.stereotype.Component;
@@ -20,14 +15,9 @@ import java.util.Optional;
 public class LobbyRepositoryAdapter implements LobbyRepositoryPort {
 
     private final LobbyJpaRepository lobbyJpaRepository;
-    private final JpaSearchAdapter<LobbyEntity> lobbyJpaSearchAdapter;
 
     public LobbyRepositoryAdapter(LobbyJpaRepository lobbyJpaRepository) {
         this.lobbyJpaRepository = lobbyJpaRepository;
-        this.lobbyJpaSearchAdapter = new JpaSearchAdapter<>(
-                lobbyJpaRepository,
-                new AnnotationSearchableEntity(LobbyEntity.class)
-        );
     }
 
     @Override
@@ -44,25 +34,12 @@ public class LobbyRepositoryAdapter implements LobbyRepositoryPort {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Lobby> findFirstOpenByTopicId(String topicId) {
-        return lobbyJpaRepository.findFirstByTopicIdAndStatusOrderByCreatedAtAsc(topicId, LobbyStatus.OPEN)
-                .map(LobbyEntityMapper::toDomain);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<Lobby> findOpenByTopicId(String topicId) {
-        return lobbyJpaRepository.findByTopicIdAndStatusOrderByCreatedAtAsc(topicId, LobbyStatus.OPEN)
+    public List<Lobby> findOpenByInitiatorId(String initiatorId) {
+        return lobbyJpaRepository
+                .findByInitiatorIdAndStatusOrderByCreatedAtDesc(initiatorId, LobbyStatus.OPEN)
                 .stream()
                 .map(LobbyEntityMapper::toDomain)
                 .toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public SearchResponse<Lobby> findAll(SearchRequest request) {
-        return lobbyJpaSearchAdapter.findAll(request)
-                .map(LobbyEntityMapper::toDomain);
     }
 
     @Override
@@ -71,4 +48,3 @@ public class LobbyRepositoryAdapter implements LobbyRepositoryPort {
         lobbyJpaRepository.deleteById(lobbyId);
     }
 }
-

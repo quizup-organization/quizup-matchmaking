@@ -3,59 +3,81 @@ package io.github.quizup.matchmaking.domain.aggregate;
 import io.github.quizup.axon.test.QuizUpAxonMatchers;
 import io.github.quizup.matchmaking.domain.command.LobbyCommand;
 import io.github.quizup.matchmaking.domain.event.LobbyEvent;
-import io.github.quizup.matchmaking.domain.model.LobbyParticipantType;
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+
 /**
- * Test Axon in-memory de l'agrégat {@link LobbyAggregate} via {@link AggregateTestFixture}.
- * <p>
- * 100 % in-memory : event store de l'agrégat en mémoire, aucun Postgres ni Axon Server.
+ * Test Axon in-memory de {@link LobbyAggregate} (salon privé, deux humains).
  */
 class LobbyAggregateTest {
+
+    private static final String LOBBY_ID = "lobby-1";
+    private static final String TOPIC = "topic-1";
+    private static final String INITIATOR = "initiator-1";
+    private static final String PARTICIPANT = "player-2";
 
     private final AggregateTestFixture<LobbyAggregate> fixture =
             new AggregateTestFixture<>(LobbyAggregate.class);
 
     @Test
-    void openLobby_appliesLobbyOpenedEvent() {
-        LobbyCommand.OpenLobbyCommand command = new LobbyCommand.OpenLobbyCommand(
-                "lobby-1", "initiator-1", "topic-1");
-
+    void createLobby_appliesCreatedEvent() {
         fixture.givenNoPriorActivity()
-                .when(command)
+                .when(new LobbyCommand.CreateLobbyCommand(LOBBY_ID, TOPIC, INITIATOR))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
-                        LobbyEvent.LobbyOpenedEvent.class,
-                        e -> ((LobbyEvent.LobbyOpenedEvent) e).lobbyId().equals("lobby-1")
-                                && ((LobbyEvent.LobbyOpenedEvent) e).initiatorId().equals("initiator-1")));
+                        LobbyEvent.LobbyCreatedEvent.class,
+                        e -> ((LobbyEvent.LobbyCreatedEvent) e).lobbyId().equals(LOBBY_ID)
+                                && ((LobbyEvent.LobbyCreatedEvent) e).initiatorId().equals(INITIATOR)));
     }
 
     @Test
-    void purgeLobby_afterCompletion_appliesPurgedEvent_andDeletesAggregate() {
-        LobbyEvent.LobbyOpenedEvent opened =
-                new LobbyEvent.LobbyOpenedEvent("lobby-1", "topic-1", "initiator-1", java.time.Instant.now());
-        LobbyEvent.LobbyJoinedEvent joined =
-                new LobbyEvent.LobbyJoinedEvent("lobby-1", "challenger-1", LobbyParticipantType.HUMAN, java.time.Instant.now());
-        LobbyEvent.LobbyCompletedEvent completed =
-                new LobbyEvent.LobbyCompletedEvent("lobby-1", "game-1", "initiator-1", "challenger-1",
-                        "topic-1", false, java.time.Instant.now());
+    void joiningTwiceIsIdempotent() {
+        fixture.given(created(), joined())
+                .when(new LobbyCommand.JoinLobbyCommand(LOBBY_ID, PARTICIPANT))
+                .expectNoEvents();
+    }
 
-        fixture.given(opened, joined, completed)
-                .when(new LobbyCommand.PurgeLobbyCommand("lobby-1"))
-                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
-                        LobbyEvent.LobbyPurgedEvent.class,
-                        e -> ((LobbyEvent.LobbyPurgedEvent) e).lobbyId().equals("lobby-1")));
+    @Test
+    void complete_purgesLobby() {
+        fixture.given(created(), joined())
+                .when(new LobbyCommand.CompleteLobbyCommand(LOBBY_ID, "game-1"))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                        LobbyEvent.LobbyCompletedEvent.class,
+                        e -> "game-1".equals(((LobbyEvent.LobbyCompletedEvent) e).gameId())));
+    }
+
+    @Test
+    void leave_cancelsLobby() {
+        fixture.given(created(), joined())
+                .when(new LobbyCommand.LeaveLobbyCommand(LOBBY_ID, PARTICIPANT))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                        LobbyEvent.LobbyCancelledEvent.class,
+                        e -> "PLAYER_LEFT".equals(((LobbyEvent.LobbyCancelledEvent) e).reason())));
+    }
+
+    @Test
+    void fail_setsFailed() {
+        fixture.given(created(), joined())
+                .when(new LobbyCommand.FailLobbyCommand(LOBBY_ID, "GAME_CREATION_FAILED"))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                        LobbyEvent.LobbyFailedEvent.class,
+                        e -> "GAME_CREATION_FAILED".equals(((LobbyEvent.LobbyFailedEvent) e).reason())));
     }
 
     @Test
     void purgeLobby_leavesAggregateDeleted_soItCannotBeReloaded() {
-        LobbyEvent.LobbyOpenedEvent opened =
-                new LobbyEvent.LobbyOpenedEvent("lobby-1", "topic-1", "initiator-1", java.time.Instant.now());
-        LobbyEvent.LobbyPurgedEvent purged =
-                new LobbyEvent.LobbyPurgedEvent("lobby-1", java.time.Instant.now());
-
-        fixture.given(opened, purged)
-                .when(new LobbyCommand.JoinLobbyCommand("lobby-1", "challenger-1", LobbyParticipantType.HUMAN))
+        fixture.given(created(), new LobbyEvent.LobbyPurgedEvent(LOBBY_ID, Instant.now()))
+                .when(new LobbyCommand.JoinLobbyCommand(LOBBY_ID, PARTICIPANT))
                 .expectException(org.axonframework.modelling.command.AggregateNotFoundException.class);
+    }
+
+    private static LobbyEvent.LobbyCreatedEvent created() {
+        return new LobbyEvent.LobbyCreatedEvent(
+                LOBBY_ID, TOPIC, INITIATOR, Instant.now().plusSeconds(3600), Instant.now());
+    }
+
+    private static LobbyEvent.LobbyJoinedEvent joined() {
+        return new LobbyEvent.LobbyJoinedEvent(LOBBY_ID, PARTICIPANT, Instant.now());
     }
 }

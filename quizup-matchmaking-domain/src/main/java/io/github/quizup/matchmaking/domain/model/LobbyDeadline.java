@@ -4,13 +4,18 @@ import java.time.Duration;
 
 public interface LobbyDeadline {
 
-    /** Attente d'un adversaire humain avant fallback bot automatique. */
+    /** Recherche d'un adversaire humain avant bascule sur une partie bot. */
     String MATCHMAKING_DEADLINE = "matchmaking-deadline";
 
-    Duration MATCHMAKING_DEADLINE_DURATION = Duration.ofSeconds(10);
+    Duration MATCHMAKING_DEADLINE_DURATION = Duration.ofSeconds(5);
 
-    /** Rétention d'un lobby fermé avant purge (laisse le temps au client de lire le ticket). */
+    /** Expiration d'un salon privé jamais rejoint. */
+    String LOBBY_EXPIRY = "lobby-expiry";
+
+    Duration LOBBY_EXPIRY_DURATION = Duration.ofHours(1);
+
+    /** Rétention d'un état terminal (annulé/expiré/échoué) avant purge : le client lit l'état. */
     String LOBBY_PURGE = "lobby-purge";
 
-    Duration LOBBY_RETENTION_DURATION = Duration.ofHours(1);
+    Duration LOBBY_RETENTION_DURATION = Duration.ofMinutes(2);
 }

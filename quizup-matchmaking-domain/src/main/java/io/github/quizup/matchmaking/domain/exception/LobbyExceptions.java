@@ -25,48 +25,34 @@ public final class LobbyExceptions {
         public LobbyNotFoundProblem(String lobbyId) {
             super(lobbyId, "urn:quizup:lobby:notFound",
                     ProblemCategory.BUSINESS_RESOURCE_MISSING,
-                    "Lobby introuvable", "Le lobby " + lobbyId + " n'existe pas", null);
+                    "Salon introuvable", "Le salon " + lobbyId + " n'existe pas", null);
         }
     }
 
     public static class LobbyNotAvailableProblem extends LobbyProblem {
         public LobbyNotAvailableProblem(String lobbyId) {
             super(lobbyId, "urn:quizup:lobby:notAvailable",
-                    "Lobby non disponible", "Ce lobby est déjà fermé ou annulé");
+                    "Salon non disponible", "Ce salon est déjà fermé ou annulé");
         }
     }
 
     public static class LobbyAlreadyFullProblem extends LobbyProblem {
         public LobbyAlreadyFullProblem(String lobbyId) {
             super(lobbyId, "urn:quizup:lobby:alreadyFull",
-                    "Lobby complet", "Ce lobby a déjà un challenger");
-        }
-    }
-
-    public static class LobbyAlreadyClosedProblem extends LobbyProblem {
-        public LobbyAlreadyClosedProblem(String lobbyId) {
-            super(lobbyId, "urn:quizup:lobby:alreadyClosed",
-                    "Lobby déjà fermé", "Une partie a déjà été créée pour ce lobby");
-        }
-    }
-
-    public static class LobbyAlreadyCancelledProblem extends LobbyProblem {
-        public LobbyAlreadyCancelledProblem(String lobbyId) {
-            super(lobbyId, "urn:quizup:lobby:alreadyCancelled",
-                    "Lobby déjà annulé", "Ce lobby a déjà été annulé");
+                    "Salon complet", "Ce salon a déjà un second participant");
         }
     }
 
     public static class MissingPlayerIdentifierProblem extends LobbyProblem {
-        public MissingPlayerIdentifierProblem(String lobbyId) {
-            super(lobbyId, "urn:quizup:lobby:missingPlayerId",
+        public MissingPlayerIdentifierProblem(String id) {
+            super(id, "urn:quizup:lobby:missingPlayerId",
                     "Identifiant joueur manquant", "Un identifiant joueur valide est requis");
         }
     }
 
     public static class MissingTopicIdentifierProblem extends LobbyProblem {
-        public MissingTopicIdentifierProblem(String lobbyId) {
-            super(lobbyId, "urn:quizup:lobby:missingTopicId",
+        public MissingTopicIdentifierProblem(String id) {
+            super(id, "urn:quizup:lobby:missingTopicId",
                     "Identifiant topic manquant", "Un identifiant topic valide est requis");
         }
     }
@@ -78,25 +64,35 @@ public final class LobbyExceptions {
         }
     }
 
-    public static class PlayerAlreadyInLobbyProblem extends LobbyProblem {
-        public PlayerAlreadyInLobbyProblem(String lobbyId, String playerId) {
-            super(lobbyId, "urn:quizup:lobby:playerAlreadyInLobby",
-                    "Joueur déjà présent", "Le joueur " + playerId + " est déjà dans ce lobby");
-        }
-    }
-
     public static class PlayerNotInLobbyProblem extends LobbyProblem {
-        public PlayerNotInLobbyProblem(String lobbyId, String playerId) {
-            super(lobbyId, "urn:quizup:lobby:playerNotInLobby",
-                    "Joueur absent", "Le joueur " + playerId + " n'est pas dans ce lobby");
+        public PlayerNotInLobbyProblem(String id, String playerId) {
+            super(id, "urn:quizup:lobby:playerNotInLobby",
+                    "Joueur absent", "Le joueur " + playerId + " n'est pas dans ce salon");
         }
     }
 
-    public static class ChallengerNotPresentProblem extends LobbyProblem {
-        public ChallengerNotPresentProblem(String lobbyId) {
-            super(lobbyId, "urn:quizup:lobby:challengerNotPresent",
-                    "Challenger absent", "Un challenger est requis pour fermer le lobby");
+    public static class ParticipantNotPresentProblem extends LobbyProblem {
+        public ParticipantNotPresentProblem(String lobbyId) {
+            super(lobbyId, "urn:quizup:lobby:participantNotPresent",
+                    "Second participant absent", "Un second participant est requis pour clore le salon");
         }
     }
 
+    public static class MatchmakingNotFoundProblem extends LobbyProblem {
+        public MatchmakingNotFoundProblem(String matchmakingId) {
+            super(matchmakingId, "urn:quizup:matchmaking:notFound",
+                    ProblemCategory.BUSINESS_RESOURCE_MISSING,
+                    "Recherche introuvable", "La recherche " + matchmakingId + " n'existe pas", null);
+        }
+    }
+
+    public static class MatchmakingNotSearchingProblem extends LobbyProblem {
+        public MatchmakingNotSearchingProblem(String matchmakingId, String currentStatus) {
+            super(matchmakingId, "urn:quizup:matchmaking:notSearching",
+                    ProblemCategory.BUSINESS_INVALID_COMMAND,
+                    "Recherche non active",
+                    "La recherche " + matchmakingId + " est en statut " + currentStatus,
+                    Map.of("currentStatus", currentStatus));
+        }
+    }
 }

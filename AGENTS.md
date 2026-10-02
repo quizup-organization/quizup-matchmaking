@@ -1,7 +1,8 @@
 # AGENTS.md — quizup-matchmaking
 
-> Service de **matchmaking** : lobbies et appariement de joueurs. Architecture : Axon Framework
-> (CQRS/EDA) + JPA (projections). Utilise des sagas et deadlines pour la gestion des lobbies.
+> Service de **matchmaking** : appariement public (« Défier le monde ») et salons privés (salle
+> d'attente). Architecture : Axon Framework (CQRS/EDA) + JPA (projections). Sagas et deadlines
+> pour l'appariement et l'expiration.
 > Pour les règles de patterns : [
 `../../best-practices/.backend/hexagonal-architecture.md`](../../best-practices/.backend/hexagonal-architecture.md).
 
@@ -9,9 +10,14 @@
 
 ## 1. Rôle
 
-Gestion des **lobbies** (salles) ouvertes pour trouver des adversaires : création, recherche,
-rejoindre, annulation. Les lobbies sont le point d'entrée pour démarrer un jeu (voir
-`quizup-game`).
+Deux responsabilités **distinctes**, chacune avec son agrégat :
+
+- **Appariement public** (`MatchmakingAggregate`) : trouve un adversaire pour un sujet
+  (même thème, niveau ±5, langues **en union** couvertes par le thème) ; à l'échéance de **5 s**
+  sans adversaire, crée une **partie bot**. Le bot n'est jamais un participant du salon.
+- **Salon privé** (`LobbyAggregate`) : salle d'attente entre **deux humains**. Le lien de partage
+  est l'identifiant de l'agrégat (`/join/{lobbyId}`) — pas de code dédié. Dès que le second joueur
+  a rejoint, la partie est créée puis le salon est **purgé immédiatement**.
 
 **Package** : `io.github.quizup.matchmaking`
 
@@ -23,56 +29,58 @@ Service **headless** : aucun contrôleur REST ni WebSocket. La surface applicati
 **`quizup-bff`** (`/api/**` + `/ws`) ; il interroge ce service via le **query bus** Axon et consomme
 ses événements. Les handlers de requête/commande, sagas et projections restent la seule surface
 exposée par le service.
+
 ## 3. Use cases (ports entrants — `domain/port/in/`)
 
-- `OpenLobbyUseCase` — création d'un lobby ouvert
-- `JoinLobbyUseCase` — un joueur rejoint un lobby
-- `CancelLobbyUseCase` — annulation d'un lobby
-- `GetLobbyUseCase` — récupération par id
-- `GetLobbyEventsUseCase` — lecture des événements d'un lobby (event store)
-- `GetOpenLobbiesByTopicUseCase` — lobbies ouverts pour un topic
-- `SearchLobbyUseCase` — recherche paginée
+- `MatchmakingUseCase` — démarrer / annuler une recherche d'appariement public
+- `LobbyUseCase` — créer / rejoindre / quitter / annuler un salon privé
+- `GetMatchmakingUseCase` — récupération d'un ticket + événements (event store)
+- `GetLobbyUseCase` — récupération d'un salon, salons ouverts du joueur + événements
 
 ---
 
 ## 4. Dépendances inter-services
 
-| Port out   | Service cible     | Query Axon envoyée (QueryGateway) |
-|------------|-------------------|-----------------------------------|
-| `ProfileRepositoryPort` | `quizup-profile` | `ProfileQuery.GetProfileQuery`   |
-| `MatchmakingPlayerPort` (présence) | `quizup-profile` | `PresenceQuery.GetPresencesByIdsQuery` |
+| Port out                          | Service cible     | Query Axon envoyée (QueryGateway)          |
+|-----------------------------------|-------------------|--------------------------------------------|
+| `ProfileRepositoryPort`           | `quizup-profile`  | `ProfileQuery.GetProfileQuery`              |
+| `MatchmakingPlayerPort` (présence)| `quizup-profile`  | `PresenceQuery.GetPresencesByIdsQuery`      |
+| `TopicAvailabilityPort`           | `quizup-theme`    | `QuestionQuery.CountApprovedQuestionsByTopicAndLanguagesQuery` |
 
-Implémentation : `application/service/MatchmakingPlayerService` (→ profile/progression, nom + niveau + pays).
+Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau + pays),
+`TopicAvailabilityService` (couverture des langues), `PlayerService`.
 
-**Ports sortants locaux** : `LobbyRepositoryPort`, `LobbyEventStorePort`.
+**Ports sortants locaux** : `MatchmakingPoolPort`, `MatchmakingRepositoryPort`,
+`MatchmakingEventStorePort`, `LobbyRepositoryPort`, `LobbyEventStorePort`.
 
-### Contrat BFF (ticket)
+### Appariement public (`MatchmakingSaga`)
 
-- `POST /api/matchmaking/tickets` (file d'attente) ; `GET /{ticketId}` ;
-  `POST /{ticketId}/cancel` ; `GET /{ticketId}/notifications`.
-- **Read model ticket dédié** (`matchmaking_ticket_entry`, projection
-  `matchmaking-ticket-projection`) : statuts produit explicites `SEARCHING|MATCHED|CANCELLED`,
-  alimenté par les événements de lobby. `GET /{ticketId}` lit ce ticket (le BFF n'interprète plus
-  `LobbyStatus`). Le service expose son event store en **`EventEnvelope`** SDK
-  (`GetLobbyEventsQuery`, payload `LobbyEvent` typé) ; c'est le BFF qui mappe vers les notifications
-  web (`TicketNotification`, `LobbyJoinedEvent` non exposé) et les pousse sur
-  `/topic/matchmaking/tickets/{ticketId}`.
-- `MatchmakingService` apparie par **sujet + niveau ±5 + préférence pays + présence** (via
-  `MatchmakingPlayerPort.filterOnline`, requête `PresenceQuery.GetPresencesByIdsQuery`) : on ne
-  rejoint jamais un lobby dont l'initiateur est hors ligne. Les courses de join (lobby annulé ou
-  rempli entre la sélection et la commande) sont rejouées sur le candidat suivant (borné).
-- **Fallback bot automatique** (pas de queue infinie) : à l'échéance de 10 s sans adversaire, la
-  `LobbySaga` injecte le bot si l'initiateur est toujours en ligne, sinon elle **annule** le lobby
-  (initiateur parti) au lieu de créer une partie fantôme.
-- Les queries `SearchLobbyQuery` restent disponibles pour les **futures surfaces d'administration**.
+- `MatchmakingStartedEvent` → planifie une deadline **5 s** ; **le dernier arrivé** initie le
+  pairage : `MatchmakingPoolPort.candidates` (même sujet, niveau ±5, plus anciens), filtre par
+  langues (`TopicAvailabilityPort`), `claim` atomique, `CreateGameCommand(HUMAN/HUMAN)` puis
+  `MarkMatchmakingMatchedCommand` des deux tickets.
+- Deadline atteinte sans adversaire → `CreateGameCommand(BOT)` + `MarkMatchmakingMatchedCommand(vsBot=true)`.
+- Échec de création de partie → `FailMatchmakingCommand` (les deux tickets).
+- **`MatchmakingPoolPort`** isole l'index de recherche (implémentation Postgres ; un adaptateur
+  Redis pourra le remplacer sans changer le domaine ; l'agrégat reste la source de vérité).
 
-Le second joueur compatible rejoint le lobby du premier (les deux tickets pointent donc le
-**même** `lobbyId`). Le read model ticket reste lisible après fermeture (jusqu'à la purge).
+### Salon privé (`LobbySaga`)
 
-**Purge event-driven** (pas de scheduler JPA) : `LobbySaga`, à réception de
-`LobbyCompletedEvent`/`LobbyCancelledEvent`, planifie un deadline `LOBBY_PURGE`
-(`LobbyDeadline.LOBBY_RETENTION_DURATION`, 1 h). À l'échéance, la saga envoie `PurgeLobbyCommand`
-→ `LobbyPurgedEvent` → l'agrégat `markDeleted()` (flux supprimé côté event store logique) et
-`LobbyProjection` supprime sa ligne (`deleteById`). La saga se termine sur `LobbyPurgedEvent`.
-Les deadlines sont annulés de façon ciblée (`cancelSchedule(name, scheduleId)`, id conservé).
+- `LobbyCreatedEvent` → expiration planifiée (1 h).
+- `LobbyJoinedEvent` (2ᵉ humain) → `CreateGameCommand(HUMAN/HUMAN)` puis `CompleteLobbyCommand`
+  (le salon est purgé immédiatement) ; échec → `FailLobbyCommand`.
+- `LobbyCancelledEvent` / `LobbyExpiredEvent` / `LobbyFailedEvent` → purge après rétention ;
+  `LobbyPurgedEvent` termine la saga.
 
+### Contrats BFF
+
+- **Appariement** : `POST /api/matchmaking/tickets` (file) ; `GET /{ticketId}` ;
+  `POST /{ticketId}/cancel` ; `GET /{ticketId}/notifications` ; WS
+  `/topic/matchmaking/tickets/{ticketId}` (`SEARCHING|MATCHED|CANCELLED|FAILED`).
+- **Salons** : `POST /api/lobbies { topicId }` ; `GET /{lobbyId}` ; `GET /mine` ;
+  `POST /{lobbyId}/join|leave|cancel` ; `GET /{lobbyId}/notifications` ; WS
+  `/topic/lobbies/{lobbyId}` (`LOBBY_CREATED|JOINED|COMPLETED|CANCELLED|EXPIRED|FAILED`).
+- Read models : `matchmaking_entry` (pool + ticket), `lobby_entry` (salon). L'agrégat reste la
+  source de vérité ; le pool est reconstructible à partir des `MatchmakingStartedEvent`.
+- Statuts : matchmaking `SEARCHING|MATCHED|CANCELLED|FAILED` ; salon `OPEN|CANCELLED|EXPIRED|FAILED`
+  (la réussite ne persiste pas : purge).

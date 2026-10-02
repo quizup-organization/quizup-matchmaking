@@ -13,11 +13,11 @@ public final class LobbyEntityMapper {
                 .lobbyId(entity.getLobbyId())
                 .topicId(entity.getTopicId())
                 .initiatorId(entity.getInitiatorId())
-                .challengerId(entity.getChallengerId())
+                .participantId(entity.getParticipantId())
                 .gameId(entity.getGameId())
-                .vsBot(entity.isVsBot())
                 .status(entity.getStatus())
                 .createdAt(entity.getCreatedAt())
+                .expiresAt(entity.getExpiresAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
     }
@@ -27,13 +27,12 @@ public final class LobbyEntityMapper {
         entity.setLobbyId(lobby.lobbyId());
         entity.setTopicId(lobby.topicId());
         entity.setInitiatorId(lobby.initiatorId());
-        entity.setChallengerId(lobby.challengerId());
+        entity.setParticipantId(lobby.participantId());
         entity.setGameId(lobby.gameId());
-        entity.setVsBot(lobby.vsBot());
         entity.setStatus(lobby.status());
         entity.setCreatedAt(lobby.createdAt());
+        entity.setExpiresAt(lobby.expiresAt());
         entity.setUpdatedAt(lobby.updatedAt());
         return entity;
     }
 }
-

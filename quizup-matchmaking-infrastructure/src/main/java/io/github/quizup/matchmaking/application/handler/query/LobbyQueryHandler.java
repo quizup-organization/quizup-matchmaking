@@ -1,24 +1,18 @@
 package io.github.quizup.matchmaking.application.handler.query;
 
-import io.github.quizup.microservice.core.domain.model.notification.EventEnvelope;
-import io.github.quizup.microservice.core.infrastructure.in.api.response.SearchResponse;
 import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
 import io.github.quizup.matchmaking.domain.model.Lobby;
 import io.github.quizup.matchmaking.domain.port.out.LobbyEventStorePort;
 import io.github.quizup.matchmaking.domain.port.out.LobbyRepositoryPort;
 import io.github.quizup.matchmaking.domain.query.LobbyQuery;
+import io.github.quizup.microservice.core.domain.model.notification.EventEnvelope;
 import org.axonframework.queryhandling.QueryHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Optional;
 
 @Component
 public class LobbyQueryHandler {
-
-    private static final Logger logger = LoggerFactory.getLogger(LobbyQueryHandler.class);
 
     private final LobbyRepositoryPort lobbyRepositoryPort;
     private final LobbyEventStorePort lobbyEventStorePort;
@@ -30,37 +24,18 @@ public class LobbyQueryHandler {
     }
 
     @QueryHandler
-    public Optional<Lobby> handle(LobbyQuery.FindFirstOpenLobbyByTopicId query) {
-        logger.info("FindFirstOpenLobbyByTopicId: topicId={}", query.topicId());
-        return lobbyRepositoryPort.findFirstOpenByTopicId(query.topicId());
-    }
-
-    @QueryHandler
-    public List<Lobby> handle(LobbyQuery.FindOpenLobbiesByTopicId query) {
-        logger.info("FindOpenLobbiesByTopicId: topicId={}", query.topicId());
-        return lobbyRepositoryPort.findOpenByTopicId(query.topicId());
-    }
-
-    @QueryHandler
-    public Optional<Lobby> handle(LobbyQuery.FindLobbyById query) {
-        logger.info("FindLobbyById: lobbyId={}", query.lobbyId());
-        return lobbyRepositoryPort.findById(query.lobbyId());
-    }
-
-    @QueryHandler
     public Lobby handle(LobbyQuery.GetLobbyById query) {
-        logger.info("GetLobbyById: lobbyId={}", query.lobbyId());
         return lobbyRepositoryPort.findById(query.lobbyId())
                 .orElseThrow(() -> new LobbyExceptions.LobbyNotFoundProblem(query.lobbyId()));
     }
 
     @QueryHandler
-    public List<EventEnvelope> handle(LobbyQuery.GetLobbyEventsQuery query) {
-        return lobbyEventStorePort.findEventEnvelopesByLobbyId(query.lobbyId());
+    public List<Lobby> handle(LobbyQuery.GetMyOpenLobbies query) {
+        return lobbyRepositoryPort.findOpenByInitiatorId(query.playerId());
     }
 
     @QueryHandler
-    public SearchResponse<Lobby> handle(LobbyQuery.SearchLobbyQuery query) {
-        return lobbyRepositoryPort.findAll(query.request());
+    public List<EventEnvelope> handle(LobbyQuery.GetLobbyEventsQuery query) {
+        return lobbyEventStorePort.findEventEnvelopesByLobbyId(query.lobbyId());
     }
 }

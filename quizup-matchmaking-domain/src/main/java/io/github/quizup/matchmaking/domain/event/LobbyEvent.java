@@ -1,49 +1,68 @@
 package io.github.quizup.matchmaking.domain.event;
 
-import io.github.quizup.matchmaking.domain.model.LobbyParticipantType;
-
 import java.time.Instant;
 
 public interface LobbyEvent {
 
     String lobbyId();
 
-    record LobbyOpenedEvent(
+    record LobbyCreatedEvent(
             String lobbyId,
             String topicId,
             String initiatorId,
-            Instant openedAt
-    ) implements LobbyEvent {}
+            Instant expiresAt,
+            Instant createdAt
+    ) implements LobbyEvent {
+    }
 
     record LobbyJoinedEvent(
             String lobbyId,
-            String challengerId,
-            LobbyParticipantType challengerType,
+            String participantId,
             Instant joinedAt
-    ) implements LobbyEvent {}
+    ) implements LobbyEvent {
+    }
+
+    /** La partie a été créée ; le salon est purgé immédiatement (aucun statut persistant). */
+    record LobbyCompletedEvent(
+            String lobbyId,
+            String gameId,
+            Instant completedAt
+    ) implements LobbyEvent {
+    }
+
+    record LobbyLeftEvent(
+            String lobbyId,
+            String playerId,
+            Instant leftAt
+    ) implements LobbyEvent {
+    }
 
     record LobbyCancelledEvent(
             String lobbyId,
             String initiatorId,
+            String reason,
             Instant cancelledAt
-    ) implements LobbyEvent {}
+    ) implements LobbyEvent {
+    }
 
-    record LobbyCompletedEvent(
+    /** La partie n'a pas pu être créée (échec système). */
+    record LobbyFailedEvent(
             String lobbyId,
-            String gameId,
-            String initiatorId,
-            String challengerId,
-            String topicId,
-            boolean vsBot,
-            Instant closedAt
-    ) implements LobbyEvent {}
+            String reason,
+            Instant failedAt
+    ) implements LobbyEvent {
+    }
 
-    /**
-     * Le lobby est purgé après rétention : l'agrégat est supprimé et la projection
-     * supprime sa ligne. Émis par {@code PurgeLobbyCommand}.
-     */
+    record LobbyExpiredEvent(
+            String lobbyId,
+            Instant expiredAt
+    ) implements LobbyEvent {
+    }
+
+    /** Purge après rétention : l'agrégat est supprimé et la projection supprime sa ligne. */
     record LobbyPurgedEvent(
             String lobbyId,
             Instant purgedAt
-    ) implements LobbyEvent {}
+    ) implements LobbyEvent {
+    }
 }

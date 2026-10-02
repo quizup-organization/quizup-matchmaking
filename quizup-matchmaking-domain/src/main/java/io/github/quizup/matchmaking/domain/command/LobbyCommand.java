@@ -1,51 +1,67 @@
 package io.github.quizup.matchmaking.domain.command;
 
-import io.github.quizup.matchmaking.domain.model.LobbyParticipantType;
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
+/**
+ * Commandes du salon privé (salle d'attente entre deux humains).
+ * L'identifiant de l'agrégat sert de référence de partage : le lien est {@code /join/{lobbyId}}.
+ */
 public interface LobbyCommand {
 
-    /**
-     * Un joueur ouvre un lobby pour trouver un adversaire.
-     * L'initiateur est inclus — un lobby vide n'existe pas.
-     */
-    record OpenLobbyCommand(
-            @TargetAggregateIdentifier String lobbyId,
-            String initiatorId,
-            String topicId
-    ) implements LobbyCommand {}
+    String lobbyId();
 
-    /**
-     * Un challenger rejoint un lobby ouvert.
-     * Émis par le Controller (humain) ou la Saga (bot).
-     */
+    /** Ouvre un salon privé ; le créateur en est le premier participant. */
+    record CreateLobbyCommand(
+            @TargetAggregateIdentifier String lobbyId,
+            String topicId,
+            String initiatorId
+    ) implements LobbyCommand {
+    }
+
+    /** Un joueur rejoint le salon (idempotent : rejoindre à nouveau ne fait rien). */
     record JoinLobbyCommand(
             @TargetAggregateIdentifier String lobbyId,
-            String challengerId,
-            LobbyParticipantType challengerType
-    ) implements LobbyCommand {}
+            String playerId
+    ) implements LobbyCommand {
+    }
 
-    /**
-     * L'initiateur ferme sa recherche sans avoir trouvé d'adversaire.
-     */
+    /** Un participant quitte le salon avant la partie : le salon est annulé. */
+    record LeaveLobbyCommand(
+            @TargetAggregateIdentifier String lobbyId,
+            String playerId
+    ) implements LobbyCommand {
+    }
+
+    /** L'initiateur annule explicitement le salon. */
     record CancelLobbyCommand(
             @TargetAggregateIdentifier String lobbyId,
-            String initiatorId
-    ) implements LobbyCommand {}
+            String playerId
+    ) implements LobbyCommand {
+    }
 
-    /**
-     * Commande interne (Saga) : la partie est créée, le lobby se ferme.
-     */
+    /** Commande interne (saga) : la partie a été créée ; le salon est purgé immédiatement. */
     record CompleteLobbyCommand(
             @TargetAggregateIdentifier String lobbyId,
             String gameId
-    ) implements LobbyCommand {}
+    ) implements LobbyCommand {
+    }
 
-    /**
-     * Commande interne (Saga, après rétention) : purge le lobby — supprime l'agrégat
-     * (et son flux d'événements) et sa ligne de projection.
-     */
+    /** Commande interne (saga) : la partie n'a pas pu être créée (échec système). */
+    record FailLobbyCommand(
+            @TargetAggregateIdentifier String lobbyId,
+            String reason
+    ) implements LobbyCommand {
+    }
+
+    /** Commande interne (saga) : salon privé jamais rejoint, expiré. */
+    record ExpireLobbyCommand(
+            @TargetAggregateIdentifier String lobbyId
+    ) implements LobbyCommand {
+    }
+
+    /** Commande interne (saga, après rétention) : purge un état terminal. */
     record PurgeLobbyCommand(
             @TargetAggregateIdentifier String lobbyId
-    ) implements LobbyCommand {}
+    ) implements LobbyCommand {
+    }
 }

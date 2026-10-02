@@ -1,17 +1,12 @@
 package io.github.quizup.matchmaking.application.saga;
 
 import io.github.quizup.game.domain.command.GameCommand;
-import io.github.quizup.game.domain.model.GameMode;
 import io.github.quizup.game.domain.model.GamePlayerType;
 import io.github.quizup.matchmaking.domain.command.LobbyCommand;
 import io.github.quizup.matchmaking.domain.event.LobbyEvent;
 import io.github.quizup.matchmaking.domain.model.LobbyDeadline;
-import io.github.quizup.matchmaking.domain.model.LobbyParticipantType;
 import io.github.quizup.matchmaking.domain.model.LobbyPlayer;
-import io.github.quizup.matchmaking.domain.model.LobbyPolicy;
-import io.github.quizup.matchmaking.domain.port.out.MatchmakingPlayerPort;
 import io.github.quizup.matchmaking.domain.port.out.ProfileRepositoryPort;
-import io.github.quizup.matchmaking.domain.port.out.TopicAvailabilityPort;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import lombok.Getter;
 import lombok.Setter;
@@ -21,7 +16,6 @@ import org.axonframework.deadline.DeadlineManager;
 import org.axonframework.deadline.annotation.DeadlineHandler;
 import org.axonframework.modelling.saga.EndSaga;
 import org.axonframework.modelling.saga.SagaEventHandler;
-import org.axonframework.modelling.saga.SagaLifecycle;
 import org.axonframework.modelling.saga.StartSaga;
 import org.axonframework.spring.stereotype.Saga;
 import org.slf4j.Logger;
@@ -33,19 +27,13 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Orchestre le cycle de vie d'un lobby.
- * <p>
- * Responsabilité : orchestration uniquement.
- * Les règles métier (délai, fallback bot) sont dans LobbyPolicy.
- * Le mapping LobbyParticipantType → GamePlayerType se fait ici, à la frontière des bounded contexts.
- * <p>
- * Flow :
- * 1. LobbyOpenedEvent → planifie le timeout d'attente humain
- * 2a. LobbyJoinedEvent → annule le timeout, crée la partie, ferme le lobby
- * 2b. Timeout → LobbyPolicy → JoinLobbyCommand BOT
- * 3. LobbyCompletedEvent / LobbyCancelledEvent → planifie la **purge** après rétention
- * 4. Deadline purge → PurgeLobbyCommand (supprime l'agrégat + la projection)
- * 5. LobbyPurgedEvent → saga terminée
+ * Orchestration du salon privé (salle d'attente entre deux humains).
+ * <ul>
+ *   <li>{@code LobbyCreatedEvent} → planifie l'expiration (1 h).</li>
+ *   <li>{@code LobbyJoinedEvent} → crée la partie (2 humains) puis purge le salon ; échec → {@code FailLobby}.</li>
+ *   <li>annulé / expiré / échoué → purge après rétention ; {@code LobbyPurgedEvent} termine la saga.</li>
+ * </ul>
+ * Aucune notion de bot ici.
  */
 @Saga
 @ProcessingGroup("lobby-saga")
@@ -62,12 +50,6 @@ public class LobbySaga {
     @Autowired
     private transient ProfileRepositoryPort profileRepositoryPort;
 
-    @Autowired
-    private transient MatchmakingPlayerPort matchmakingPlayerPort;
-
-    @Autowired
-    private transient TopicAvailabilityPort topicAvailabilityPort;
-
     @Getter
     @Setter
     private String lobbyId;
@@ -82,19 +64,11 @@ public class LobbySaga {
 
     @Getter
     @Setter
-    private String challengerId;
+    private String participantId;
 
     @Getter
     @Setter
-    private LobbyPlayer initiatorProfile;
-
-    @Getter
-    @Setter
-    private LobbyPlayer challengerProfile;
-
-    @Getter
-    @Setter
-    private String matchmakingDeadlineId;
+    private String expiryDeadlineId;
 
     @Getter
     @Setter
@@ -102,80 +76,109 @@ public class LobbySaga {
 
     @StartSaga
     @SagaEventHandler(associationProperty = "lobbyId")
-    public void on(LobbyEvent.LobbyOpenedEvent event) {
+    public void on(LobbyEvent.LobbyCreatedEvent event) {
         this.lobbyId = event.lobbyId();
         this.topicId = event.topicId();
         this.initiatorId = event.initiatorId();
-        this.initiatorProfile = profileRepositoryPort.getById(initiatorId);
-
-        this.matchmakingDeadlineId = deadlineManager.schedule(
-                LobbyDeadline.MATCHMAKING_DEADLINE_DURATION,
-                LobbyDeadline.MATCHMAKING_DEADLINE
-        );
-
-        logger.info("Lobby ouvert, attente humain {}s: lobbyId={}", LobbyDeadline.MATCHMAKING_DEADLINE_DURATION.getSeconds(), lobbyId);
+        this.expiryDeadlineId = deadlineManager.schedule(
+                LobbyDeadline.LOBBY_EXPIRY_DURATION,
+                LobbyDeadline.LOBBY_EXPIRY);
+        logger.info("Salon privé créé, expiration dans {}h: lobbyId={}",
+                LobbyDeadline.LOBBY_EXPIRY_DURATION.toHours(), lobbyId);
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyJoinedEvent event) {
-        this.challengerId = event.challengerId();
+        this.participantId = event.participantId();
+        cancelExpiryDeadline();
 
-        cancelMatchmakingDeadline();
-
-        this.challengerProfile = profileRepositoryPort.getById(challengerId);
+        LobbyPlayer initiator = profileRepositoryPort.getById(initiatorId);
+        LobbyPlayer participant = profileRepositoryPort.getById(participantId);
 
         String gameId = UUID.randomUUID().toString();
-
-        GamePlayerType gamePlayerType = toGamePlayerType(event.challengerType());
-
-        // Le bot n'impose pas sa langue : seul l'initiateur doit disposer de sa version.
-        Set<Language> languages = event.challengerType() == LobbyParticipantType.BOT
-                ? languagesOf(initiatorProfile)
-                : languagesOf(initiatorProfile, challengerProfile);
-
-        commandGateway.send(new GameCommand.CreateGameCommand(
-                gameId,
-                topicId,
-                initiatorProfile.playerId(),
-                initiatorProfile.playerName(),
-                challengerProfile.playerId(),
-                challengerProfile.playerName(),
-                GameMode.SYNC,
-                languages,
-                gamePlayerType,
-                null,
-                null
-        ));
-
-        commandGateway.send(new LobbyCommand.CompleteLobbyCommand(lobbyId, gameId));
-
-        logger.info("Partie orchestrée: lobbyId={}, gameId={}, initiator={}, challenger={}", lobbyId, gameId, initiatorProfile.playerId(), challengerProfile.playerId());
-    }
-
-    @DeadlineHandler(deadlineName = LobbyDeadline.MATCHMAKING_DEADLINE)
-    public void onMatchmakingTimeout() {
-        boolean initiatorOnline = matchmakingPlayerPort.isOnline(initiatorId);
-
-        if (LobbyPolicy.shouldCancelOffline(challengerId, initiatorOnline)) {
-            logger.info("Timeout matchmaking — initiateur hors ligne, annulation du lobby: lobbyId={}", lobbyId);
-            commandGateway.send(new LobbyCommand.CancelLobbyCommand(lobbyId, initiatorId));
-            return;
-        }
-
-        if (LobbyPolicy.shouldFallbackToBot(challengerId, initiatorOnline)) {
-            Set<Language> initiatorLanguages = languagesOf(initiatorProfile);
-            if (!topicAvailabilityPort.coversAllLanguages(topicId, initiatorLanguages)) {
-                logger.info("Timeout matchmaking — thème indisponible dans la langue de l'initiateur, annulation: lobbyId={}", lobbyId);
-                commandGateway.send(new LobbyCommand.CancelLobbyCommand(lobbyId, initiatorId));
-                return;
-            }
-
-            logger.info("Timeout matchmaking — injection bot: lobbyId={}", lobbyId);
-            commandGateway.send(new LobbyCommand.JoinLobbyCommand(lobbyId, LobbyPolicy.BOT_PLAYER_ID, LobbyParticipantType.BOT));
+        try {
+            commandGateway.send(new GameCommand.CreateGameCommand(
+                    gameId,
+                    topicId,
+                    initiator.playerId(),
+                    initiator.playerName(),
+                    participant.playerId(),
+                    participant.playerName(),
+                    languagesOf(initiator, participant),
+                    GamePlayerType.HUMAN,
+                    null));
+            commandGateway.send(new LobbyCommand.CompleteLobbyCommand(lobbyId, gameId));
+            logger.info("Partie créée depuis le salon: lobbyId={}, gameId={}", lobbyId, gameId);
+        } catch (Exception exception) {
+            logger.error("Échec de création de partie depuis le salon: lobbyId={}", lobbyId, exception);
+            commandGateway.send(new LobbyCommand.FailLobbyCommand(lobbyId, "GAME_CREATION_FAILED"));
         }
     }
 
-    /** Langues non nulles des joueurs fournis (union). */
+    @DeadlineHandler(deadlineName = LobbyDeadline.LOBBY_EXPIRY)
+    public void onExpiry() {
+        logger.info("Expiration du salon: lobbyId={}", lobbyId);
+        commandGateway.send(new LobbyCommand.ExpireLobbyCommand(lobbyId));
+    }
+
+    @SagaEventHandler(associationProperty = "lobbyId")
+    public void on(LobbyEvent.LobbyCancelledEvent event) {
+        cancelExpiryDeadline();
+        schedulePurge();
+    }
+
+    @SagaEventHandler(associationProperty = "lobbyId")
+    public void on(LobbyEvent.LobbyExpiredEvent event) {
+        cancelExpiryDeadline();
+        schedulePurge();
+    }
+
+    @SagaEventHandler(associationProperty = "lobbyId")
+    public void on(LobbyEvent.LobbyFailedEvent event) {
+        cancelExpiryDeadline();
+        schedulePurge();
+    }
+
+    @SagaEventHandler(associationProperty = "lobbyId")
+    public void on(LobbyEvent.LobbyCompletedEvent event) {
+        cancelExpiryDeadline();
+    }
+
+    @DeadlineHandler(deadlineName = LobbyDeadline.LOBBY_PURGE)
+    public void onPurge() {
+        commandGateway.send(new LobbyCommand.PurgeLobbyCommand(lobbyId));
+    }
+
+    @EndSaga
+    @SagaEventHandler(associationProperty = "lobbyId")
+    public void on(LobbyEvent.LobbyPurgedEvent event) {
+        cancelDeadlines();
+        logger.info("Saga salon terminée (purgé): lobbyId={}", lobbyId);
+    }
+
+    private void schedulePurge() {
+        if (purgeDeadlineId == null) {
+            purgeDeadlineId = deadlineManager.schedule(
+                    LobbyDeadline.LOBBY_RETENTION_DURATION,
+                    LobbyDeadline.LOBBY_PURGE);
+        }
+    }
+
+    private void cancelDeadlines() {
+        cancelExpiryDeadline();
+        if (purgeDeadlineId != null) {
+            deadlineManager.cancelSchedule(LobbyDeadline.LOBBY_PURGE, purgeDeadlineId);
+            purgeDeadlineId = null;
+        }
+    }
+
+    private void cancelExpiryDeadline() {
+        if (expiryDeadlineId != null) {
+            deadlineManager.cancelSchedule(LobbyDeadline.LOBBY_EXPIRY, expiryDeadlineId);
+            expiryDeadlineId = null;
+        }
+    }
+
     private static Set<Language> languagesOf(LobbyPlayer... players) {
         Set<Language> languages = new HashSet<>();
         for (LobbyPlayer player : players) {
@@ -184,66 +187,5 @@ public class LobbySaga {
             }
         }
         return languages;
-    }
-
-    @SagaEventHandler(associationProperty = "lobbyId")
-    public void on(LobbyEvent.LobbyCompletedEvent event) {
-        logger.info("Lobby fermé (partie créée): lobbyId={}, gameId={}", lobbyId, event.gameId());
-        schedulePurge();
-    }
-
-    @SagaEventHandler(associationProperty = "lobbyId")
-    public void on(LobbyEvent.LobbyCancelledEvent event) {
-        cancelMatchmakingDeadline();
-        logger.info("Lobby annulé: lobbyId={}", lobbyId);
-        schedulePurge();
-    }
-
-    @DeadlineHandler(deadlineName = LobbyDeadline.LOBBY_PURGE)
-    public void onPurgeDeadline() {
-        logger.info("Rétention écoulée — purge du lobby: lobbyId={}", lobbyId);
-        commandGateway.send(new LobbyCommand.PurgeLobbyCommand(lobbyId));
-    }
-
-    @EndSaga
-    @SagaEventHandler(associationProperty = "lobbyId")
-    public void on(LobbyEvent.LobbyPurgedEvent event) {
-        cancelDeadlines();
-        logger.info("Saga terminée (lobby purgé): lobbyId={}", lobbyId);
-        SagaLifecycle.end();
-    }
-
-    private void schedulePurge() {
-        cancelDeadlines();
-        this.purgeDeadlineId = deadlineManager.schedule(
-                LobbyDeadline.LOBBY_RETENTION_DURATION,
-                LobbyDeadline.LOBBY_PURGE
-        );
-    }
-
-    private void cancelDeadlines() {
-        cancelMatchmakingDeadline();
-        cancelPurgeDeadline();
-    }
-
-    private void cancelMatchmakingDeadline() {
-        if (matchmakingDeadlineId != null) {
-            deadlineManager.cancelSchedule(LobbyDeadline.MATCHMAKING_DEADLINE, matchmakingDeadlineId);
-            matchmakingDeadlineId = null;
-        }
-    }
-
-    private void cancelPurgeDeadline() {
-        if (purgeDeadlineId != null) {
-            deadlineManager.cancelSchedule(LobbyDeadline.LOBBY_PURGE, purgeDeadlineId);
-            purgeDeadlineId = null;
-        }
-    }
-
-    private GamePlayerType toGamePlayerType(LobbyParticipantType lobbyParticipantType) {
-        return switch (lobbyParticipantType) {
-            case BOT -> GamePlayerType.BOT;
-            case HUMAN -> GamePlayerType.HUMAN;
-        };
     }
 }
