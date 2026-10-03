@@ -31,7 +31,7 @@ public class LobbyQueryHandler {
 
     @QueryHandler
     public List<Lobby> handle(LobbyQuery.GetMyOpenLobbies query) {
-        return lobbyRepositoryPort.findOpenByInitiatorId(query.playerId());
+        return lobbyRepositoryPort.findCreatedByPlayerId(query.playerId());
     }
 
     @QueryHandler

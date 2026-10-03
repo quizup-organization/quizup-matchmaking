@@ -3,7 +3,11 @@ package io.github.quizup.matchmaking.domain.aggregate;
 import io.github.quizup.matchmaking.domain.command.LobbyCommand;
 import io.github.quizup.matchmaking.domain.event.LobbyEvent;
 import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
+import io.github.quizup.matchmaking.domain.model.LobbyPlayer;
 import io.github.quizup.matchmaking.domain.model.LobbyStatus;
+import io.github.quizup.matchmaking.domain.port.out.ProfileRepositoryPort;
+import io.github.quizup.matchmaking.domain.port.out.TopicAvailabilityPort;
+import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import org.apache.commons.lang3.StringUtils;
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventsourcing.EventSourcingHandler;
@@ -14,6 +18,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.axonframework.modelling.command.AggregateLifecycle.apply;
 
@@ -21,8 +27,8 @@ import static org.axonframework.modelling.command.AggregateLifecycle.apply;
  * LobbyAggregate — salon privé : salle d'attente entre deux humains.
  * <p>
  * Le créateur est le premier participant ; le second rejoint via {@code JoinLobbyCommand}.
- * Quand la partie est créée, l'agrégat est purgé immédiatement (aucun statut persistant).
- * Aucune notion de bot ni d'appariement ici.
+ * Un état terminal (partie créée, annulé, expiré, échoué) est purgé par la saga après rétention
+ * (deadline), puis {@code markDeleted}. Aucune notion de bot ni d'appariement ici.
  */
 @Aggregate
 public class LobbyAggregate {
@@ -33,27 +39,41 @@ public class LobbyAggregate {
     private String lobbyId;
     private String topicId;
     private String initiatorId;
+    private String opponentId;
     private String participantId;
     private LobbyStatus status;
-    private boolean completed;
 
     protected LobbyAggregate() {
     }
 
+    /**
+     * Ouvre un salon privé. Si {@code opponentId} est renseigné, c'est un défi nominatif :
+     * seul cet invité pourra rejoindre, et le thème doit couvrir les langues des deux joueurs.
+     */
     @CommandHandler
-    public LobbyAggregate(LobbyCommand.CreateLobbyCommand command) {
+    public LobbyAggregate(LobbyCommand.CreateLobbyCommand command,
+                          ProfileRepositoryPort profileRepositoryPort,
+                          TopicAvailabilityPort topicAvailabilityPort) {
         if (StringUtils.isBlank(command.initiatorId())) {
             throw new LobbyExceptions.MissingPlayerIdentifierProblem(command.lobbyId());
         }
         if (StringUtils.isBlank(command.topicId())) {
             throw new LobbyExceptions.MissingTopicIdentifierProblem(command.lobbyId());
         }
-        logger.info("Creating lobby: lobbyId={}, topicId={}, initiatorId={}",
-                command.lobbyId(), command.topicId(), command.initiatorId());
+        if (StringUtils.isNotBlank(command.opponentId())) {
+            if (command.opponentId().equals(command.initiatorId())) {
+                throw new LobbyExceptions.CannotChallengeSelfProblem(command.lobbyId(), command.initiatorId());
+            }
+            requireTopicCoversLanguages(profileRepositoryPort, topicAvailabilityPort,
+                    command.initiatorId(), command.opponentId(), command.topicId());
+        }
+        logger.info("Creating lobby: lobbyId={}, topicId={}, initiatorId={}, opponentId={}",
+                command.lobbyId(), command.topicId(), command.initiatorId(), command.opponentId());
         apply(new LobbyEvent.LobbyCreatedEvent(
                 command.lobbyId(),
                 command.topicId(),
                 command.initiatorId(),
+                command.opponentId(),
                 Instant.now().plus(io.github.quizup.matchmaking.domain.model.LobbyDeadline.LOBBY_EXPIRY_DURATION),
                 Instant.now()));
     }
@@ -70,11 +90,27 @@ public class LobbyAggregate {
             // Idempotent : rejoindre à nouveau son propre salon ne fait rien.
             return;
         }
+        if (StringUtils.isNotBlank(opponentId) && !command.playerId().equals(opponentId)) {
+            throw new LobbyExceptions.LobbyNotInvitedProblem(lobbyId, command.playerId());
+        }
         if (StringUtils.isNotBlank(participantId)) {
             throw new LobbyExceptions.LobbyAlreadyFullProblem(lobbyId);
         }
         logger.info("Joining lobby: lobbyId={}, participantId={}", lobbyId, command.playerId());
         apply(new LobbyEvent.LobbyJoinedEvent(lobbyId, command.playerId(), Instant.now()));
+    }
+
+    /** Refus d'un défi nominatif par l'invité : le salon est clos. */
+    @CommandHandler
+    public void handle(LobbyCommand.DeclineLobbyCommand command) {
+        if (isClosed()) {
+            return;
+        }
+        if (StringUtils.isBlank(opponentId) || !command.playerId().equals(opponentId)) {
+            throw new LobbyExceptions.LobbyNotInvitedProblem(lobbyId, command.playerId());
+        }
+        logger.info("Declining lobby: lobbyId={}, opponentId={}", lobbyId, command.playerId());
+        apply(new LobbyEvent.LobbyDeclinedEvent(lobbyId, initiatorId, opponentId, Instant.now()));
     }
 
     @CommandHandler
@@ -99,7 +135,7 @@ public class LobbyAggregate {
         apply(new LobbyEvent.LobbyCancelledEvent(lobbyId, initiatorId, "PLAYER_CANCELLED", Instant.now()));
     }
 
-    /** Succès : la partie est créée, le salon est purgé immédiatement. */
+    /** Succès : la partie est créée ; le salon reste lisible jusqu'à sa purge par la saga. */
     @CommandHandler
     public void handle(LobbyCommand.CompleteLobbyCommand command) {
         if (StringUtils.isBlank(command.gameId())) {
@@ -110,7 +146,6 @@ public class LobbyAggregate {
         }
         logger.info("Completing lobby: lobbyId={}, gameId={}", lobbyId, command.gameId());
         apply(new LobbyEvent.LobbyCompletedEvent(lobbyId, command.gameId(), Instant.now()));
-        apply(new LobbyEvent.LobbyPurgedEvent(lobbyId, Instant.now()));
     }
 
     /** Échec système : la partie n'a pas pu être créée. */
@@ -145,8 +180,31 @@ public class LobbyAggregate {
         }
     }
 
+    /**
+     * Un défi nominatif n'est créé que si le thème couvre les langues des deux joueurs
+     * (sélection stricte côté game) — échec rapide plutôt qu'à la jointure.
+     */
+    private static void requireTopicCoversLanguages(ProfileRepositoryPort profileRepositoryPort,
+                                                    TopicAvailabilityPort topicAvailabilityPort,
+                                                    String initiatorId,
+                                                    String opponentId,
+                                                    String topicId) {
+        Set<Language> languages = new HashSet<>();
+        LobbyPlayer initiator = profileRepositoryPort.getById(initiatorId);
+        LobbyPlayer opponent = profileRepositoryPort.getById(opponentId);
+        if (initiator != null && initiator.language() != null) {
+            languages.add(initiator.language());
+        }
+        if (opponent != null && opponent.language() != null) {
+            languages.add(opponent.language());
+        }
+        if (!languages.isEmpty() && !topicAvailabilityPort.coversAllLanguages(topicId, languages)) {
+            throw new LobbyExceptions.TopicNotAvailableInLanguageProblem(topicId, languages);
+        }
+    }
+
     private boolean isClosed() {
-        return completed || status == LobbyStatus.CANCELLED || status == LobbyStatus.EXPIRED || status == LobbyStatus.FAILED;
+        return status == LobbyStatus.CLOSED || status == LobbyStatus.FAILED;
     }
 
     // ============================ Event Sourcing ============================
@@ -156,7 +214,8 @@ public class LobbyAggregate {
         this.lobbyId = event.lobbyId();
         this.topicId = event.topicId();
         this.initiatorId = event.initiatorId();
-        this.status = LobbyStatus.OPEN;
+        this.opponentId = event.opponentId();
+        this.status = LobbyStatus.CREATED;
     }
 
     @EventSourcingHandler
@@ -165,8 +224,13 @@ public class LobbyAggregate {
     }
 
     @EventSourcingHandler
+    public void on(LobbyEvent.LobbyDeclinedEvent event) {
+        this.status = LobbyStatus.CLOSED;
+    }
+
+    @EventSourcingHandler
     public void on(LobbyEvent.LobbyCompletedEvent event) {
-        this.completed = true;
+        this.status = LobbyStatus.CLOSED;
     }
 
     @EventSourcingHandler
@@ -178,7 +242,7 @@ public class LobbyAggregate {
 
     @EventSourcingHandler
     public void on(LobbyEvent.LobbyCancelledEvent event) {
-        this.status = LobbyStatus.CANCELLED;
+        this.status = LobbyStatus.CLOSED;
     }
 
     @EventSourcingHandler
@@ -188,7 +252,7 @@ public class LobbyAggregate {
 
     @EventSourcingHandler
     public void on(LobbyEvent.LobbyExpiredEvent event) {
-        this.status = LobbyStatus.EXPIRED;
+        this.status = LobbyStatus.CLOSED;
     }
 
     @EventSourcingHandler

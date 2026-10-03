@@ -14,12 +14,20 @@ public interface LobbyCommand {
     record CreateLobbyCommand(
             @TargetAggregateIdentifier String lobbyId,
             String topicId,
-            String initiatorId
+            String initiatorId,
+            String opponentId
     ) implements LobbyCommand {
     }
 
     /** Un joueur rejoint le salon (idempotent : rejoindre à nouveau ne fait rien). */
     record JoinLobbyCommand(
+            @TargetAggregateIdentifier String lobbyId,
+            String playerId
+    ) implements LobbyCommand {
+    }
+
+    /** L'invité refuse un défi nominatif ; le salon est clos. */
+    record DeclineLobbyCommand(
             @TargetAggregateIdentifier String lobbyId,
             String playerId
     ) implements LobbyCommand {

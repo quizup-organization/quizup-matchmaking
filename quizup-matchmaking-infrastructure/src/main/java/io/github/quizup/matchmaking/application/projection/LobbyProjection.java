@@ -30,7 +30,8 @@ public class LobbyProjection {
                 .lobbyId(event.lobbyId())
                 .topicId(event.topicId())
                 .initiatorId(event.initiatorId())
-                .status(LobbyStatus.OPEN)
+                .opponentId(event.opponentId())
+                .status(LobbyStatus.CREATED)
                 .createdAt(event.createdAt())
                 .expiresAt(event.expiresAt())
                 .updatedAt(event.createdAt())
@@ -50,8 +51,17 @@ public class LobbyProjection {
     @Transactional
     public void on(LobbyEvent.LobbyCancelledEvent event) {
         update(event.lobbyId(), lobby -> lobby.toBuilder()
-                .status(LobbyStatus.CANCELLED)
+                .status(LobbyStatus.CLOSED)
                 .updatedAt(event.cancelledAt())
+                .build());
+    }
+
+    @EventHandler
+    @Transactional
+    public void on(LobbyEvent.LobbyDeclinedEvent event) {
+        update(event.lobbyId(), lobby -> lobby.toBuilder()
+                .status(LobbyStatus.CLOSED)
+                .updatedAt(event.declinedAt())
                 .build());
     }
 
@@ -59,7 +69,7 @@ public class LobbyProjection {
     @Transactional
     public void on(LobbyEvent.LobbyExpiredEvent event) {
         update(event.lobbyId(), lobby -> lobby.toBuilder()
-                .status(LobbyStatus.EXPIRED)
+                .status(LobbyStatus.CLOSED)
                 .updatedAt(event.expiredAt())
                 .build());
     }
@@ -76,7 +86,11 @@ public class LobbyProjection {
     @EventHandler
     @Transactional
     public void on(LobbyEvent.LobbyCompletedEvent event) {
-        lobbyRepositoryPort.deleteById(event.lobbyId());
+        update(event.lobbyId(), lobby -> lobby.toBuilder()
+                .status(LobbyStatus.CLOSED)
+                .gameId(event.gameId())
+                .updatedAt(event.completedAt())
+                .build());
     }
 
     @EventHandler

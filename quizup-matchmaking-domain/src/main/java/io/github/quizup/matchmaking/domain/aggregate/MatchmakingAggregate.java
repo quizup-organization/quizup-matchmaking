@@ -9,6 +9,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventsourcing.EventSourcingHandler;
 import org.axonframework.modelling.command.AggregateIdentifier;
+import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +77,7 @@ public class MatchmakingAggregate {
 
     @CommandHandler
     public void handle(MatchmakingCommand.MarkMatchmakingMatchedCommand command) {
-        if (status == MatchmakingStatus.MATCHED) {
+        if (status == MatchmakingStatus.CLOSED) {
             if (command.gameId().equals(gameId)) {
                 return;
             }
@@ -93,6 +94,13 @@ public class MatchmakingAggregate {
                 command.gameId(),
                 command.vsBot(),
                 Instant.now()));
+    }
+
+    /** Commande interne (saga, après rétention) : purge l'état terminal, l'agrégat est supprimé. */
+    @CommandHandler
+    public void handle(MatchmakingCommand.PurgeMatchmakingCommand command) {
+        logger.info("Purging matchmaking: matchmakingId={}", matchmakingId);
+        apply(new MatchmakingEvent.MatchmakingPurgedEvent(matchmakingId, Instant.now()));
     }
 
     @CommandHandler
@@ -118,7 +126,7 @@ public class MatchmakingAggregate {
 
     @EventSourcingHandler
     public void on(MatchmakingEvent.MatchmakingMatchedEvent event) {
-        this.status = MatchmakingStatus.MATCHED;
+        this.status = MatchmakingStatus.CLOSED;
         this.opponentId = event.opponentId();
         this.gameId = event.gameId();
         this.vsBot = event.vsBot();
@@ -126,11 +134,16 @@ public class MatchmakingAggregate {
 
     @EventSourcingHandler
     public void on(MatchmakingEvent.MatchmakingCancelledEvent event) {
-        this.status = MatchmakingStatus.CANCELLED;
+        this.status = MatchmakingStatus.CLOSED;
     }
 
     @EventSourcingHandler
     public void on(MatchmakingEvent.MatchmakingFailedEvent event) {
         this.status = MatchmakingStatus.FAILED;
+    }
+
+    @EventSourcingHandler
+    public void on(MatchmakingEvent.MatchmakingPurgedEvent event) {
+        AggregateLifecycle.markDeleted();
     }
 }

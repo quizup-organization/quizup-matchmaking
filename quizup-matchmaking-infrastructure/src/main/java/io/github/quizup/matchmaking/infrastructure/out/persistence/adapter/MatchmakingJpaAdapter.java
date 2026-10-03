@@ -74,4 +74,10 @@ public class MatchmakingJpaAdapter implements MatchmakingPoolPort, MatchmakingRe
     public Optional<Matchmaking> findById(String matchmakingId) {
         return repository.findById(matchmakingId).map(MatchmakingEntityMapper::toDomain);
     }
+
+    @Override
+    @Transactional
+    public void deleteById(String matchmakingId) {
+        repository.deleteById(matchmakingId);
+    }
 }

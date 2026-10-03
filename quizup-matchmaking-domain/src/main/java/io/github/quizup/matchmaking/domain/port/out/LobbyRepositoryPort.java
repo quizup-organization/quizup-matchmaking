@@ -11,7 +11,7 @@ public interface LobbyRepositoryPort {
 
     Optional<Lobby> findById(String lobbyId);
 
-    List<Lobby> findOpenByInitiatorId(String initiatorId);
+    List<Lobby> findCreatedByPlayerId(String playerId);
 
     void deleteById(String lobbyId);
 }

@@ -97,7 +97,7 @@ public class LobbySaga {
 
         String gameId = UUID.randomUUID().toString();
         try {
-            commandGateway.send(new GameCommand.CreateGameCommand(
+            commandGateway.sendAndWait(new GameCommand.CreateGameCommand(
                     gameId,
                     topicId,
                     initiator.playerId(),
@@ -128,6 +128,12 @@ public class LobbySaga {
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")
+    public void on(LobbyEvent.LobbyDeclinedEvent event) {
+        cancelExpiryDeadline();
+        schedulePurge();
+    }
+
+    @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyExpiredEvent event) {
         cancelExpiryDeadline();
         schedulePurge();
@@ -142,6 +148,7 @@ public class LobbySaga {
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyCompletedEvent event) {
         cancelExpiryDeadline();
+        schedulePurge();
     }
 
     @DeadlineHandler(deadlineName = LobbyDeadline.LOBBY_PURGE)

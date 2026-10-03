@@ -44,4 +44,10 @@ public interface MatchmakingCommand {
             String reason
     ) implements MatchmakingCommand {
     }
+
+    /** Commande interne (saga, après rétention) : purge un état terminal. */
+    record PurgeMatchmakingCommand(
+            @TargetAggregateIdentifier String matchmakingId
+    ) implements MatchmakingCommand {
+    }
 }

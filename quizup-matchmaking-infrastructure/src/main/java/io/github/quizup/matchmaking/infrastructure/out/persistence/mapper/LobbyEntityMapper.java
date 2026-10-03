@@ -13,6 +13,7 @@ public final class LobbyEntityMapper {
                 .lobbyId(entity.getLobbyId())
                 .topicId(entity.getTopicId())
                 .initiatorId(entity.getInitiatorId())
+                .opponentId(entity.getOpponentId())
                 .participantId(entity.getParticipantId())
                 .gameId(entity.getGameId())
                 .status(entity.getStatus())
@@ -27,6 +28,7 @@ public final class LobbyEntityMapper {
         entity.setLobbyId(lobby.lobbyId());
         entity.setTopicId(lobby.topicId());
         entity.setInitiatorId(lobby.initiatorId());
+        entity.setOpponentId(lobby.opponentId());
         entity.setParticipantId(lobby.participantId());
         entity.setGameId(lobby.gameId());
         entity.setStatus(lobby.status());

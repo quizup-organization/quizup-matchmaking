@@ -43,7 +43,7 @@ public class MatchmakingProjection {
     @Transactional
     public void on(MatchmakingEvent.MatchmakingMatchedEvent event) {
         update(event.matchmakingId(), matchmaking -> matchmaking.toBuilder()
-                .status(MatchmakingStatus.MATCHED)
+                .status(MatchmakingStatus.CLOSED)
                 .opponentId(event.opponentId())
                 .gameId(event.gameId())
                 .vsBot(event.vsBot())
@@ -55,7 +55,7 @@ public class MatchmakingProjection {
     @Transactional
     public void on(MatchmakingEvent.MatchmakingCancelledEvent event) {
         update(event.matchmakingId(), matchmaking -> matchmaking.toBuilder()
-                .status(MatchmakingStatus.CANCELLED)
+                .status(MatchmakingStatus.CLOSED)
                 .updatedAt(event.cancelledAt())
                 .build());
     }
@@ -67,6 +67,12 @@ public class MatchmakingProjection {
                 .status(MatchmakingStatus.FAILED)
                 .updatedAt(event.failedAt())
                 .build());
+    }
+
+    @EventHandler
+    @Transactional
+    public void on(MatchmakingEvent.MatchmakingPurgedEvent event) {
+        repository.deleteById(event.matchmakingId());
     }
 
     private void update(String matchmakingId, java.util.function.UnaryOperator<Matchmaking> transform) {

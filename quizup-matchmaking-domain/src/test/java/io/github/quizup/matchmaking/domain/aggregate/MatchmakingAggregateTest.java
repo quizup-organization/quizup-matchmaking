@@ -64,6 +64,13 @@ class MatchmakingAggregateTest {
                         e -> ((MatchmakingEvent.MatchmakingFailedEvent) e).matchmakingId().equals(MM_ID)));
     }
 
+    @Test
+    void purge_leavesAggregateDeleted_soItCannotBeReloaded() {
+        fixture.given(started(), new MatchmakingEvent.MatchmakingPurgedEvent(MM_ID, java.time.Instant.now()))
+                .when(new MatchmakingCommand.CancelMatchmakingCommand(MM_ID, PLAYER))
+                .expectException(org.axonframework.modelling.command.AggregateNotFoundException.class);
+    }
+
     private static MatchmakingEvent.MatchmakingStartedEvent started() {
         return new MatchmakingEvent.MatchmakingStartedEvent(
                 MM_ID, PLAYER, TOPIC, 10, Set.of(Language.FR), java.time.Instant.now());

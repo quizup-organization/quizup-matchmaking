@@ -10,6 +10,7 @@ public interface LobbyEvent {
             String lobbyId,
             String topicId,
             String initiatorId,
+            String opponentId,
             Instant expiresAt,
             Instant createdAt
     ) implements LobbyEvent {
@@ -19,6 +20,15 @@ public interface LobbyEvent {
             String lobbyId,
             String participantId,
             Instant joinedAt
+    ) implements LobbyEvent {
+    }
+
+    /** Défi nominatif refusé par l'invité ; le salon est clos. */
+    record LobbyDeclinedEvent(
+            String lobbyId,
+            String initiatorId,
+            String opponentId,
+            Instant declinedAt
     ) implements LobbyEvent {
     }
 

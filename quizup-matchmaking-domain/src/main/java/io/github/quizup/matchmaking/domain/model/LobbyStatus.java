@@ -1,18 +1,18 @@
 package io.github.quizup.matchmaking.domain.model;
 
 /**
- * Statut d'un salon privé (salle d'attente). Pas de notion d'appariement ici.
+ * Statut d'un salon privé (salle d'attente), volontairement réduit au cycle de vie.
  * <ul>
- *   <li>{@link #OPEN} — en attente du second joueur.</li>
- *   <li>{@link #CANCELLED} — annulé par un joueur.</li>
- *   <li>{@link #EXPIRED} — jamais rejoint dans le délai.</li>
- *   <li>{@link #FAILED} — la partie n'a pas pu être créée (échec système).</li>
+ *   <li>{@link #CREATED} — en attente du second joueur.</li>
+ *   <li>{@link #CLOSED} — parcours terminé normalement (partie créée, annulé, refusé, expiré).
+ *       L'issue exacte est portée par l'événement terminal et la notification.</li>
+ *   <li>{@link #FAILED} — issue anormale : la partie n'a pas pu être créée.</li>
  * </ul>
- * La réussite (partie créée) ne donne pas de statut : l'agrégat est purgé immédiatement.
+ * Aucune suppression immédiate : un état terminal est purgé par la saga après rétention
+ * (deadline), puis {@code markDeleted} (standard Axon).
  */
 public enum LobbyStatus {
-    OPEN,
-    CANCELLED,
-    EXPIRED,
+    CREATED,
+    CLOSED,
     FAILED
 }

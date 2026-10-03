@@ -1,6 +1,5 @@
 package io.github.quizup.matchmaking.infrastructure.out.persistence.repository;
 
-import io.github.quizup.matchmaking.domain.model.MatchmakingStatus;
 import io.github.quizup.matchmaking.infrastructure.out.persistence.entity.MatchmakingEntity;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,6 +18,7 @@ public interface MatchmakingJpaRepository extends JpaRepository<MatchmakingEntit
             select e from MatchmakingEntity e
             where e.topicId = :topicId
               and e.status = io.github.quizup.matchmaking.domain.model.MatchmakingStatus.SEARCHING
+              and e.claimedBy is null
               and e.playerId <> :excludePlayerId
               and e.level between :minLevel and :maxLevel
             order by abs(e.level - :level) asc, e.createdAt asc
@@ -30,27 +30,21 @@ public interface MatchmakingJpaRepository extends JpaRepository<MatchmakingEntit
                                            @Param("maxLevel") int maxLevel,
                                            Limit limit);
 
-    /** Claim atomique : ne réussit que si la recherche est encore SEARCHING. */
+    /**
+     * Claim atomique du pool : ne réussit que si la recherche est encore SEARCHING et non
+     * réclamée. Le statut n'est pas modifié : la projection le passera à CLOSED à réception de
+     * {@code MatchmakingMatchedEvent}.
+     */
     @Modifying
     @Query("""
             update MatchmakingEntity e
-            set e.status = io.github.quizup.matchmaking.domain.model.MatchmakingStatus.MATCHED,
-                e.claimedBy = :claimedBy,
+            set e.claimedBy = :claimedBy,
                 e.updatedAt = :now
             where e.matchmakingId = :matchmakingId
               and e.status = io.github.quizup.matchmaking.domain.model.MatchmakingStatus.SEARCHING
+              and e.claimedBy is null
             """)
     int claim(@Param("matchmakingId") String matchmakingId,
               @Param("claimedBy") String claimedBy,
               @Param("now") Instant now);
-
-    @Query("""
-            select e from MatchmakingEntity e
-            where e.status = io.github.quizup.matchmaking.domain.model.MatchmakingStatus.SEARCHING
-              and e.createdAt < :before
-            """)
-    List<MatchmakingEntity> findExpiredSearches(@Param("before") Instant before,
-                                                Limit limit);
-
-    List<MatchmakingEntity> findByStatus(MatchmakingStatus status);
 }

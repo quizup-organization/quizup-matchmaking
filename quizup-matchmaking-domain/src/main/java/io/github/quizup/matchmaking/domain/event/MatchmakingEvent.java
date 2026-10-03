@@ -41,4 +41,11 @@ public interface MatchmakingEvent {
             Instant failedAt
     ) implements MatchmakingEvent {
     }
+
+    /** Purge après rétention : l'agrégat est supprimé et la projection supprime sa ligne. */
+    record MatchmakingPurgedEvent(
+            String matchmakingId,
+            Instant purgedAt
+    ) implements MatchmakingEvent {
+    }
 }

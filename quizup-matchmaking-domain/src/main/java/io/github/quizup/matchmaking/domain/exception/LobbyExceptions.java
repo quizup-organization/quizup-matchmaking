@@ -71,6 +71,23 @@ public final class LobbyExceptions {
         }
     }
 
+    public static class CannotChallengeSelfProblem extends LobbyProblem {
+        public CannotChallengeSelfProblem(String lobbyId, String playerId) {
+            super(lobbyId, "urn:quizup:lobby:cannotChallengeSelf",
+                    "Défi impossible", "Le joueur " + playerId + " ne peut pas se défier lui-même");
+        }
+    }
+
+    public static class LobbyNotInvitedProblem extends LobbyProblem {
+        public LobbyNotInvitedProblem(String lobbyId, String playerId) {
+            super(lobbyId, "urn:quizup:lobby:notInvited",
+                    ProblemCategory.PERMISSION,
+                    "Défi non adressé",
+                    "Le joueur " + playerId + " n'est pas l'invité de ce défi",
+                    Map.of("playerId", playerId));
+        }
+    }
+
     public static class ParticipantNotPresentProblem extends LobbyProblem {
         public ParticipantNotPresentProblem(String lobbyId) {
             super(lobbyId, "urn:quizup:lobby:participantNotPresent",

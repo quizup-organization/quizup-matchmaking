@@ -12,4 +12,6 @@ public interface MatchmakingRepositoryPort {
     void save(Matchmaking matchmaking);
 
     Optional<Matchmaking> findById(String matchmakingId);
+
+    void deleteById(String matchmakingId);
 }

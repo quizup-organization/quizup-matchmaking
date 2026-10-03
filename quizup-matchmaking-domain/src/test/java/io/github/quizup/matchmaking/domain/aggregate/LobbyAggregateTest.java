@@ -3,6 +3,9 @@ package io.github.quizup.matchmaking.domain.aggregate;
 import io.github.quizup.axon.test.QuizUpAxonMatchers;
 import io.github.quizup.matchmaking.domain.command.LobbyCommand;
 import io.github.quizup.matchmaking.domain.event.LobbyEvent;
+import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
+import io.github.quizup.matchmaking.domain.port.out.ProfileRepositoryPort;
+import io.github.quizup.matchmaking.domain.port.out.TopicAvailabilityPort;
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.junit.jupiter.api.Test;
 
@@ -16,19 +19,42 @@ class LobbyAggregateTest {
     private static final String LOBBY_ID = "lobby-1";
     private static final String TOPIC = "topic-1";
     private static final String INITIATOR = "initiator-1";
+    private static final String OPPONENT = "opponent-1";
     private static final String PARTICIPANT = "player-2";
 
     private final AggregateTestFixture<LobbyAggregate> fixture =
             new AggregateTestFixture<>(LobbyAggregate.class);
 
+    LobbyAggregateTest() {
+        fixture.registerInjectableResource((ProfileRepositoryPort) id -> null);
+        fixture.registerInjectableResource((TopicAvailabilityPort) (topicId, languages) -> true);
+    }
+
     @Test
     void createLobby_appliesCreatedEvent() {
         fixture.givenNoPriorActivity()
-                .when(new LobbyCommand.CreateLobbyCommand(LOBBY_ID, TOPIC, INITIATOR))
+                .when(new LobbyCommand.CreateLobbyCommand(LOBBY_ID, TOPIC, INITIATOR, null))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         LobbyEvent.LobbyCreatedEvent.class,
                         e -> ((LobbyEvent.LobbyCreatedEvent) e).lobbyId().equals(LOBBY_ID)
-                                && ((LobbyEvent.LobbyCreatedEvent) e).initiatorId().equals(INITIATOR)));
+                                && ((LobbyEvent.LobbyCreatedEvent) e).initiatorId().equals(INITIATOR)
+                                && ((LobbyEvent.LobbyCreatedEvent) e).opponentId() == null));
+    }
+
+    @Test
+    void createNominalChallenge_appliesCreatedEventWithOpponent() {
+        fixture.givenNoPriorActivity()
+                .when(new LobbyCommand.CreateLobbyCommand(LOBBY_ID, TOPIC, INITIATOR, OPPONENT))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        LobbyEvent.LobbyCreatedEvent.class,
+                        e -> OPPONENT.equals(((LobbyEvent.LobbyCreatedEvent) e).opponentId())));
+    }
+
+    @Test
+    void cannotChallengeSelf() {
+        fixture.givenNoPriorActivity()
+                .when(new LobbyCommand.CreateLobbyCommand(LOBBY_ID, TOPIC, INITIATOR, INITIATOR))
+                .expectException(LobbyExceptions.CannotChallengeSelfProblem.class);
     }
 
     @Test
@@ -39,10 +65,42 @@ class LobbyAggregateTest {
     }
 
     @Test
-    void complete_purgesLobby() {
+    void nominalChallenge_refusesOtherPlayer() {
+        fixture.given(createdWithOpponent())
+                .when(new LobbyCommand.JoinLobbyCommand(LOBBY_ID, PARTICIPANT))
+                .expectException(LobbyExceptions.LobbyNotInvitedProblem.class);
+    }
+
+    @Test
+    void nominalChallenge_letsInvitedPlayerJoin() {
+        fixture.given(createdWithOpponent())
+                .when(new LobbyCommand.JoinLobbyCommand(LOBBY_ID, OPPONENT))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                        LobbyEvent.LobbyJoinedEvent.class,
+                        e -> OPPONENT.equals(((LobbyEvent.LobbyJoinedEvent) e).participantId())));
+    }
+
+    @Test
+    void nominalChallenge_declinedByInvitedPlayer() {
+        fixture.given(createdWithOpponent())
+                .when(new LobbyCommand.DeclineLobbyCommand(LOBBY_ID, OPPONENT))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                        LobbyEvent.LobbyDeclinedEvent.class,
+                        e -> OPPONENT.equals(((LobbyEvent.LobbyDeclinedEvent) e).opponentId())));
+    }
+
+    @Test
+    void nominalChallenge_declineRefusedToOthers() {
+        fixture.given(createdWithOpponent())
+                .when(new LobbyCommand.DeclineLobbyCommand(LOBBY_ID, PARTICIPANT))
+                .expectException(LobbyExceptions.LobbyNotInvitedProblem.class);
+    }
+
+    @Test
+    void complete_closesLobbyWithoutImmediatePurge() {
         fixture.given(created(), joined())
                 .when(new LobbyCommand.CompleteLobbyCommand(LOBBY_ID, "game-1"))
-                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         LobbyEvent.LobbyCompletedEvent.class,
                         e -> "game-1".equals(((LobbyEvent.LobbyCompletedEvent) e).gameId())));
     }
@@ -74,7 +132,12 @@ class LobbyAggregateTest {
 
     private static LobbyEvent.LobbyCreatedEvent created() {
         return new LobbyEvent.LobbyCreatedEvent(
-                LOBBY_ID, TOPIC, INITIATOR, Instant.now().plusSeconds(3600), Instant.now());
+                LOBBY_ID, TOPIC, INITIATOR, null, Instant.now().plusSeconds(3600), Instant.now());
+    }
+
+    private static LobbyEvent.LobbyCreatedEvent createdWithOpponent() {
+        return new LobbyEvent.LobbyCreatedEvent(
+                LOBBY_ID, TOPIC, INITIATOR, OPPONENT, Instant.now().plusSeconds(3600), Instant.now());
     }
 
     private static LobbyEvent.LobbyJoinedEvent joined() {

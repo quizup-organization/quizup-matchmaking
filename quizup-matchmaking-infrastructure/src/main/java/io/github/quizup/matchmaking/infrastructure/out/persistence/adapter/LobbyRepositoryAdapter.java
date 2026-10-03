@@ -34,9 +34,9 @@ public class LobbyRepositoryAdapter implements LobbyRepositoryPort {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Lobby> findOpenByInitiatorId(String initiatorId) {
+    public List<Lobby> findCreatedByPlayerId(String playerId) {
         return lobbyJpaRepository
-                .findByInitiatorIdAndStatusOrderByCreatedAtDesc(initiatorId, LobbyStatus.OPEN)
+                .findCreatedByPlayerId(LobbyStatus.CREATED, playerId)
                 .stream()
                 .map(LobbyEntityMapper::toDomain)
                 .toList();

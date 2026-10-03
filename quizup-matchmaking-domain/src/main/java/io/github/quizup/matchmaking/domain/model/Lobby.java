@@ -13,6 +13,7 @@ public record Lobby(
         String lobbyId,
         String topicId,
         String initiatorId,
+        String opponentId,
         String participantId,
         String gameId,
         LobbyStatus status,

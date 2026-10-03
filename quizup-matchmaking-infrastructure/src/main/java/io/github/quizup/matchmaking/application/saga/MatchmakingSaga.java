@@ -93,6 +93,10 @@ public class MatchmakingSaga {
 
     @Getter
     @Setter
+    private String purgeDeadlineId;
+
+    @Getter
+    @Setter
     private boolean finished;
 
     @StartSaga
@@ -138,7 +142,7 @@ public class MatchmakingSaga {
         PlayerSummary me = playerPort.getPlayer(playerId);
         PlayerSummary opponent = playerPort.getPlayer(candidate.playerId());
         try {
-            commandGateway.send(new GameCommand.CreateGameCommand(
+            commandGateway.sendAndWait(new GameCommand.CreateGameCommand(
                     gameId,
                     topicId,
                     playerId,
@@ -170,7 +174,7 @@ public class MatchmakingSaga {
         String gameId = UUID.randomUUID().toString();
         PlayerSummary me = playerPort.getPlayer(playerId);
         try {
-            commandGateway.send(new GameCommand.CreateGameCommand(
+            commandGateway.sendAndWait(new GameCommand.CreateGameCommand(
                     gameId,
                     topicId,
                     playerId,
@@ -189,25 +193,53 @@ public class MatchmakingSaga {
         this.finished = true;
     }
 
-    @EndSaga
     @SagaEventHandler(associationProperty = "matchmakingId")
     public void on(MatchmakingEvent.MatchmakingMatchedEvent event) {
         cancelDeadline();
+        schedulePurge();
         this.finished = true;
     }
 
-    @EndSaga
     @SagaEventHandler(associationProperty = "matchmakingId")
     public void on(MatchmakingEvent.MatchmakingCancelledEvent event) {
         cancelDeadline();
+        schedulePurge();
         this.finished = true;
+    }
+
+    @SagaEventHandler(associationProperty = "matchmakingId")
+    public void on(MatchmakingEvent.MatchmakingFailedEvent event) {
+        cancelDeadline();
+        schedulePurge();
+        this.finished = true;
+    }
+
+    @DeadlineHandler(deadlineName = LobbyDeadline.MATCHMAKING_PURGE)
+    public void onPurge() {
+        commandGateway.send(new MatchmakingCommand.PurgeMatchmakingCommand(matchmakingId));
     }
 
     @EndSaga
     @SagaEventHandler(associationProperty = "matchmakingId")
-    public void on(MatchmakingEvent.MatchmakingFailedEvent event) {
+    public void on(MatchmakingEvent.MatchmakingPurgedEvent event) {
+        cancelDeadlines();
+        logger.info("Saga matchmaking terminée (purgée): matchmakingId={}", matchmakingId);
+    }
+
+    private void schedulePurge() {
+        if (purgeDeadlineId == null) {
+            purgeDeadlineId = deadlineManager.schedule(
+                    LobbyDeadline.MATCHMAKING_RETENTION_DURATION,
+                    LobbyDeadline.MATCHMAKING_PURGE);
+        }
+    }
+
+    private void cancelDeadlines() {
         cancelDeadline();
-        this.finished = true;
+        if (purgeDeadlineId != null) {
+            deadlineManager.cancelSchedule(LobbyDeadline.MATCHMAKING_PURGE, purgeDeadlineId);
+            purgeDeadlineId = null;
+        }
     }
 
     private void cancelDeadline() {

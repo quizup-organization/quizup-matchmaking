@@ -18,4 +18,9 @@ public interface LobbyDeadline {
     String LOBBY_PURGE = "lobby-purge";
 
     Duration LOBBY_RETENTION_DURATION = Duration.ofMinutes(2);
+
+    /** Rétention d'un ticket d'appariement terminal avant purge (read model). */
+    String MATCHMAKING_PURGE = "matchmaking-purge";
+
+    Duration MATCHMAKING_RETENTION_DURATION = Duration.ofMinutes(2);
 }

@@ -15,6 +15,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "lobby_entry", indexes = {
         @Index(name = "idx_lobby_initiator", columnList = "initiator_id"),
+        @Index(name = "idx_lobby_opponent", columnList = "opponent_id"),
         @Index(name = "idx_lobby_status", columnList = "status")
 })
 public class LobbyEntity {
@@ -28,6 +29,9 @@ public class LobbyEntity {
 
     @Column(name = "initiator_id", nullable = false)
     private String initiatorId;
+
+    @Column(name = "opponent_id")
+    private String opponentId;
 
     @Column(name = "participant_id")
     private String participantId;

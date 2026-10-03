@@ -15,9 +15,22 @@ Deux responsabilités **distinctes**, chacune avec son agrégat :
 - **Appariement public** (`MatchmakingAggregate`) : trouve un adversaire pour un sujet
   (même thème, niveau ±5, langues **en union** couvertes par le thème) ; à l'échéance de **5 s**
   sans adversaire, crée une **partie bot**. Le bot n'est jamais un participant du salon.
-- **Salon privé** (`LobbyAggregate`) : salle d'attente entre **deux humains**. Le lien de partage
-  est l'identifiant de l'agrégat (`/join/{lobbyId}`) — pas de code dédié. Dès que le second joueur
-  a rejoint, la partie est créée puis le salon est **purgé immédiatement**.
+- **Salon privé** (`LobbyAggregate`) : salle d'attente entre **deux humains**. Lien partageable
+  (`/join/{lobbyId}`) ou **défi nominatif** (`opponentId` : seul l'invité peut rejoindre ou
+  refuser). Dès que le second joueur a rejoint, la partie est créée.
+
+### Cycle de vie (statuts réduits)
+
+Les deux agrégats sont **éphémères** : statuts réduits au cycle de vie et suppression différée.
+
+- `MatchmakingStatus = SEARCHING | CLOSED | FAILED` ; `LobbyStatus = CREATED | CLOSED | FAILED`.
+- `CLOSED` = fin normale (partie créée, annulée, refusée, expirée) ; `FAILED` = échec système
+  (création de partie impossible). L'issue exacte est portée par l'événement terminal et la
+  notification.
+- **Aucune suppression immédiate** : l'agrégat reste joignable pendant la **rétention**
+  (`LOBBY_PURGE` / `MATCHMAKING_PURGE`, 2 min) puis la saga envoie la commande de purge ;
+  `markDeleted()` est appelé dans l'`@EventSourcingHandler` du `*PurgedEvent` (standard Axon).
+  L'event store conserve l'historique (`GET .../notifications` reste lisible après purge).
 
 **Package** : `io.github.quizup.matchmaking`
 
@@ -33,9 +46,9 @@ exposée par le service.
 ## 3. Use cases (ports entrants — `domain/port/in/`)
 
 - `MatchmakingUseCase` — démarrer / annuler une recherche d'appariement public
-- `LobbyUseCase` — créer / rejoindre / quitter / annuler un salon privé
+- `LobbyUseCase` — créer / rejoindre / refuser / quitter / annuler un salon privé
 - `GetMatchmakingUseCase` — récupération d'un ticket + événements (event store)
-- `GetLobbyUseCase` — récupération d'un salon, salons ouverts du joueur + événements
+- `GetLobbyUseCase` — récupération d'un salon, salons ouverts du joueur (initiateur ou invité) + événements
 
 ---
 
@@ -66,21 +79,28 @@ Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau +
 
 ### Salon privé (`LobbySaga`)
 
+- Création nominative (`opponentId`) : auto-défi interdit (`CannotChallengeSelfProblem`) et garde
+  linguistique (`TopicAvailabilityPort` + langues des deux profils) → `TopicNotAvailableInLanguageProblem`.
 - `LobbyCreatedEvent` → expiration planifiée (1 h).
-- `LobbyJoinedEvent` (2ᵉ humain) → `CreateGameCommand(HUMAN/HUMAN)` puis `CompleteLobbyCommand`
-  (le salon est purgé immédiatement) ; échec → `FailLobbyCommand`.
-- `LobbyCancelledEvent` / `LobbyExpiredEvent` / `LobbyFailedEvent` → purge après rétention ;
-  `LobbyPurgedEvent` termine la saga.
+- `LobbyJoinedEvent` (2ᵉ humain) → `CreateGameCommand(HUMAN/HUMAN)` **attendu** (`sendAndWait`,
+  pour compenser un échec asynchrone) puis `CompleteLobbyCommand` ; échec → `FailLobbyCommand`.
+- `LobbyCancelled|Declined|Expired|Completed|Failed` → `CLOSED`/`FAILED` + purge planifiée
+  (rétention 2 min) ; `LobbyPurgedEvent` termine la saga (`markDeleted`).
+- **`MatchmakingPoolPort`** : le claim n'écrit plus de statut (uniquement `claimed_by`), le statut
+  reste `SEARCHING` jusqu'à la projection du `Matched`.
 
 ### Contrats BFF
 
 - **Appariement** : `POST /api/matchmaking/tickets` (file) ; `GET /{ticketId}` ;
   `POST /{ticketId}/cancel` ; `GET /{ticketId}/notifications` ; WS
   `/topic/matchmaking/tickets/{ticketId}` (`SEARCHING|MATCHED|CANCELLED|FAILED`).
-- **Salons** : `POST /api/lobbies { topicId }` ; `GET /{lobbyId}` ; `GET /mine` ;
-  `POST /{lobbyId}/join|leave|cancel` ; `GET /{lobbyId}/notifications` ; WS
-  `/topic/lobbies/{lobbyId}` (`LOBBY_CREATED|JOINED|COMPLETED|CANCELLED|EXPIRED|FAILED`).
+- **Salons** : `POST /api/lobbies { topicId, opponentId? }` (nominatif si `opponentId`) ;
+  `GET /{lobbyId}` ; `GET /mine` (initiateur **ou** invité) ;
+  `POST /{lobbyId}/join|decline|leave|cancel` ; `GET /{lobbyId}/notifications` ; WS
+  `/topic/lobbies/{lobbyId}` (`LOBBY_CREATED|JOINED|DECLINED|COMPLETED|CANCELLED|EXPIRED|FAILED`).
+- **Notifications personnelles** : consommées par `quizup-notification` depuis le bus Kafka ;
+  poussées par le BFF sur `/topic/notifications/{userId}`.
 - Read models : `matchmaking_entry` (pool + ticket), `lobby_entry` (salon). L'agrégat reste la
   source de vérité ; le pool est reconstructible à partir des `MatchmakingStartedEvent`.
-- Statuts : matchmaking `SEARCHING|MATCHED|CANCELLED|FAILED` ; salon `OPEN|CANCELLED|EXPIRED|FAILED`
-  (la réussite ne persiste pas : purge).
+- Statuts : matchmaking `SEARCHING|CLOSED|FAILED` ; salon `CREATED|CLOSED|FAILED`
+  (rétention puis purge).
