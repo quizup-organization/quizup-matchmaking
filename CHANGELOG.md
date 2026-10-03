@@ -1,3 +1,9 @@
+## [4.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.0.0...v4.1.0) (2026-10-03)
+
+### Features
+
+* **matchmaking:** nominative lobbies, decline and simplified statuses ([7410a37](https://github.com/quizup-organization/quizup-matchmaking/commit/7410a374d3e7cf0ac6d6b61f79eb778fe63e8216))
+
 ## [4.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v3.0.0...v4.0.0) (2026-10-02)
 
 ### ⚠ BREAKING CHANGES
