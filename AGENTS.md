@@ -15,9 +15,13 @@ Deux responsabilités **distinctes**, chacune avec son agrégat :
 - **Appariement public** (`MatchmakingAggregate`) : trouve un adversaire pour un sujet
   (même thème, niveau ±5, langues **en union** couvertes par le thème) ; à l'échéance de **5 s**
   sans adversaire, crée une **partie bot**. Le bot n'est jamais un participant du salon.
-- **Salon privé** (`LobbyAggregate`) : salle d'attente entre **deux humains**. Lien partageable
-  (`/join/{lobbyId}`) ou **défi nominatif** (`opponentId` : seul l'invité peut rejoindre ou
-  refuser). Dès que le second joueur a rejoint, la partie est créée.
+- **Défi nominatif** (`ChallengeAggregate`) : intention **asynchrone** « A défie B » (TTL 1 h,
+  accept/refuse/annule/expire), sans présence ni partie. À l'acceptation, une saga crée la salle.
+- **Salle temps réel** (`LobbyAggregate`) : présence des deux humains (lien partageable
+  `/join/{lobbyId}` ou salle issue d'un défi). Chacun **entre** (`EnterLobbyRoom`) ; quand les deux
+  sont présents, un **compte à rebours de 20 s** précède la création de la partie. Fenêtre de
+  présence de **3 min** après acceptation (au-delà : `MISSED`), et un joueur hors ligne ferme ses
+  salles ouvertes (`RoomPresenceHandler`).
 
 ### Cycle de vie (statuts réduits)
 
@@ -81,9 +85,13 @@ Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau +
 
 - Création nominative (`opponentId`) : auto-défi interdit (`CannotChallengeSelfProblem`) et garde
   linguistique (`TopicAvailabilityPort` + langues des deux profils) → `TopicNotAvailableInLanguageProblem`.
-- `LobbyCreatedEvent` → expiration planifiée (1 h).
-- `LobbyJoinedEvent` (2ᵉ humain) → `CreateGameCommand(HUMAN/HUMAN)` **attendu** (`sendAndWait`,
-  pour compenser un échec asynchrone) puis `CompleteLobbyCommand` ; échec → `FailLobbyCommand`.
+- `LobbyCreatedEvent` → expiration planifiée (1 h, lien partagé jamais rejoint).
+- `LobbyJoinedEvent` (2ᵉ humain connu) → **fenêtre de présence 3 min** (`LOBBY_WAIT_OPPONENT`).
+- `LobbyAllPlayersPresentEvent` (les deux entrés) → **compte à rebours 20 s** (`LOBBY_READY_CHECK`).
+- Fin du compte à rebours → `CreateGameCommand(HUMAN/HUMAN)` **attendu** (`sendAndWait`, pour
+  compenser un échec asynchrone) puis `CompleteLobbyCommand` ; échec → `FailLobbyCommand`.
+- Fenêtre expirée → `MissLobbyCommand` (`MISSED`, absent déduit des présences).
+- `PlayerWentOfflineEvent` (profile) → `RoomPresenceHandler` ferme les salles ouvertes du joueur.
 - `LobbyCancelled|Declined|Expired|Completed|Failed` → `CLOSED`/`FAILED` + purge planifiée
   (rétention 2 min) ; `LobbyPurgedEvent` termine la saga (`markDeleted`).
 - **`MatchmakingPoolPort`** : le claim n'écrit plus de statut (uniquement `claimed_by`), le statut
