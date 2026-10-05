@@ -19,10 +19,10 @@ public interface LobbyDeadline {
 
     Duration LOBBY_WAIT_OPPONENT_DURATION = Duration.ofMinutes(3);
 
-    /** Compte à rebours avant création de la partie, une fois les deux joueurs présents. */
+    /** Compte à rebours court avant création de la partie, une fois les deux joueurs présents. */
     String LOBBY_READY_CHECK = "lobby-ready-check";
 
-    Duration LOBBY_READY_CHECK_DURATION = Duration.ofSeconds(20);
+    Duration LOBBY_READY_CHECK_DURATION = Duration.ofSeconds(3);
 
     /** Rétention d'un état terminal (annulé/expiré/échoué) avant purge : le client lit l'état. */
     String LOBBY_PURGE = "lobby-purge";
