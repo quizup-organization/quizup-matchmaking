@@ -40,7 +40,7 @@ class ChallengeProjectionTest {
         when(repository.findById("challenge-1")).thenReturn(Optional.of(challenge()));
 
         projection.on(new ChallengeEvent.ChallengeAcceptedEvent(
-                "challenge-1", "challenger-1", "opponent-1", AT));
+                "challenge-1", "topic-1", "challenger-1", "opponent-1", AT));
 
         ArgumentCaptor<Challenge> captor = ArgumentCaptor.forClass(Challenge.class);
         verify(repository).save(captor.capture());
