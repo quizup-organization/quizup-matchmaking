@@ -27,11 +27,14 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Orchestration du salon privé (salle d'attente entre deux humains).
+ * Orchestration de la salle temps réel (deux humains).
  * <ul>
- *   <li>{@code LobbyCreatedEvent} → planifie l'expiration (1 h).</li>
- *   <li>{@code LobbyJoinedEvent} → crée la partie (2 humains) puis purge le salon ; échec → {@code FailLobby}.</li>
- *   <li>annulé / expiré / échoué → purge après rétention ; {@code LobbyPurgedEvent} termine la saga.</li>
+ *   <li>{@code LobbyCreatedEvent} → expiration d'un lien partagé jamais rejoint (1 h).</li>
+ *   <li>{@code LobbyJoinedEvent} → fenêtre de présence pour l'adversaire ({@code WAIT_OPPONENT}, 3 min).</li>
+ *   <li>{@code LobbyAllPlayersPresentEvent} → compte à rebours de lancement ({@code READY_CHECK}, 20 s).</li>
+ *   <li>Fin du compte à rebours → création de la partie (2 humains) puis clôture de la salle.</li>
+ *   <li>Fenêtre expirée → {@code MissLobby} ; un joueur disparaît → {@code MissLobby} (présence).</li>
+ *   <li>États terminaux → purge après rétention ; {@code LobbyPurgedEvent} termine la saga.</li>
  * </ul>
  * Aucune notion de bot ici.
  */
@@ -72,6 +75,14 @@ public class LobbySaga {
 
     @Getter
     @Setter
+    private String waitDeadlineId;
+
+    @Getter
+    @Setter
+    private String readyDeadlineId;
+
+    @Getter
+    @Setter
     private String purgeDeadlineId;
 
     @StartSaga
@@ -83,7 +94,7 @@ public class LobbySaga {
         this.expiryDeadlineId = deadlineManager.schedule(
                 LobbyDeadline.LOBBY_EXPIRY_DURATION,
                 LobbyDeadline.LOBBY_EXPIRY);
-        logger.info("Salon privé créé, expiration dans {}h: lobbyId={}",
+        logger.info("Salle créée, expiration du lien dans {}h: lobbyId={}",
                 LobbyDeadline.LOBBY_EXPIRY_DURATION.toHours(), lobbyId);
     }
 
@@ -91,7 +102,40 @@ public class LobbySaga {
     public void on(LobbyEvent.LobbyJoinedEvent event) {
         this.participantId = event.participantId();
         cancelExpiryDeadline();
+        // L'adversaire est connu : on lui laisse une fenêtre courte pour se présenter en salle.
+        if (waitDeadlineId == null) {
+            waitDeadlineId = deadlineManager.schedule(
+                    LobbyDeadline.LOBBY_WAIT_OPPONENT_DURATION,
+                    LobbyDeadline.LOBBY_WAIT_OPPONENT);
+        }
+        logger.info("Salon rejoint, fenêtre de présence de {} min: lobbyId={}",
+                LobbyDeadline.LOBBY_WAIT_OPPONENT_DURATION.toMinutes(), lobbyId);
+    }
 
+    @SagaEventHandler(associationProperty = "lobbyId")
+    public void on(LobbyEvent.LobbyAllPlayersPresentEvent event) {
+        cancelWaitDeadline();
+        if (readyDeadlineId == null) {
+            readyDeadlineId = deadlineManager.schedule(
+                    LobbyDeadline.LOBBY_READY_CHECK_DURATION,
+                    LobbyDeadline.LOBBY_READY_CHECK);
+        }
+        logger.info("Les deux joueurs sont présents, lancement dans {}s: lobbyId={}",
+                LobbyDeadline.LOBBY_READY_CHECK_DURATION.toSeconds(), lobbyId);
+    }
+
+    @DeadlineHandler(deadlineName = LobbyDeadline.LOBBY_WAIT_OPPONENT)
+    public void onWaitOpponentExpired() {
+        logger.info("Adversaire absent de la salle: lobbyId={}", lobbyId);
+        commandGateway.send(new LobbyCommand.MissLobbyCommand(lobbyId, "OPPONENT_OFFLINE", null));
+    }
+
+    @DeadlineHandler(deadlineName = LobbyDeadline.LOBBY_READY_CHECK)
+    public void onReadyCheckExpired() {
+        createGameAndComplete();
+    }
+
+    private void createGameAndComplete() {
         LobbyPlayer initiator = profileRepositoryPort.getById(initiatorId);
         LobbyPlayer participant = profileRepositoryPort.getById(participantId);
 
@@ -108,9 +152,9 @@ public class LobbySaga {
                     GamePlayerType.HUMAN,
                     null));
             commandGateway.send(new LobbyCommand.CompleteLobbyCommand(lobbyId, gameId));
-            logger.info("Partie créée depuis le salon: lobbyId={}, gameId={}", lobbyId, gameId);
+            logger.info("Partie créée depuis la salle: lobbyId={}, gameId={}", lobbyId, gameId);
         } catch (Exception exception) {
-            logger.error("Échec de création de partie depuis le salon: lobbyId={}", lobbyId, exception);
+            logger.error("Échec de création de partie depuis la salle: lobbyId={}", lobbyId, exception);
             commandGateway.send(new LobbyCommand.FailLobbyCommand(lobbyId, "GAME_CREATION_FAILED"));
         }
     }
@@ -123,31 +167,37 @@ public class LobbySaga {
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyCancelledEvent event) {
-        cancelExpiryDeadline();
+        cancelAllWaitDeadlines();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyDeclinedEvent event) {
-        cancelExpiryDeadline();
+        cancelAllWaitDeadlines();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyExpiredEvent event) {
-        cancelExpiryDeadline();
+        cancelAllWaitDeadlines();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyFailedEvent event) {
-        cancelExpiryDeadline();
+        cancelAllWaitDeadlines();
+        schedulePurge();
+    }
+
+    @SagaEventHandler(associationProperty = "lobbyId")
+    public void on(LobbyEvent.LobbyMissedEvent event) {
+        cancelAllWaitDeadlines();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyCompletedEvent event) {
-        cancelExpiryDeadline();
+        cancelAllWaitDeadlines();
         schedulePurge();
     }
 
@@ -159,7 +209,7 @@ public class LobbySaga {
     @EndSaga
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyPurgedEvent event) {
-        cancelDeadlines();
+        cancelAllDeadlines();
         logger.info("Saga salon terminée (purgé): lobbyId={}", lobbyId);
     }
 
@@ -171,18 +221,38 @@ public class LobbySaga {
         }
     }
 
-    private void cancelDeadlines() {
+    private void cancelAllDeadlines() {
         cancelExpiryDeadline();
+        cancelAllWaitDeadlines();
         if (purgeDeadlineId != null) {
             deadlineManager.cancelSchedule(LobbyDeadline.LOBBY_PURGE, purgeDeadlineId);
             purgeDeadlineId = null;
         }
     }
 
+    private void cancelAllWaitDeadlines() {
+        cancelWaitDeadline();
+        cancelReadyDeadline();
+    }
+
     private void cancelExpiryDeadline() {
         if (expiryDeadlineId != null) {
             deadlineManager.cancelSchedule(LobbyDeadline.LOBBY_EXPIRY, expiryDeadlineId);
             expiryDeadlineId = null;
+        }
+    }
+
+    private void cancelWaitDeadline() {
+        if (waitDeadlineId != null) {
+            deadlineManager.cancelSchedule(LobbyDeadline.LOBBY_WAIT_OPPONENT, waitDeadlineId);
+            waitDeadlineId = null;
+        }
+    }
+
+    private void cancelReadyDeadline() {
+        if (readyDeadlineId != null) {
+            deadlineManager.cancelSchedule(LobbyDeadline.LOBBY_READY_CHECK, readyDeadlineId);
+            readyDeadlineId = null;
         }
     }
 

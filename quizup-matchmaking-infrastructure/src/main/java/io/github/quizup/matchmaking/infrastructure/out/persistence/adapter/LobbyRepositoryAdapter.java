@@ -43,6 +43,16 @@ public class LobbyRepositoryAdapter implements LobbyRepositoryPort {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<Lobby> findOpenByPlayerId(String playerId) {
+        return lobbyJpaRepository
+                .findOpenByPlayerId(LobbyStatus.CREATED, playerId)
+                .stream()
+                .map(LobbyEntityMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     @Transactional
     public void deleteById(String lobbyId) {
         lobbyJpaRepository.deleteById(lobbyId);

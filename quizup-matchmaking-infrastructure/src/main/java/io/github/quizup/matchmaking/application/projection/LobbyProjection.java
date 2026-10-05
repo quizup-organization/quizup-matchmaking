@@ -49,6 +49,50 @@ public class LobbyProjection {
 
     @EventHandler
     @Transactional
+    public void on(LobbyEvent.LobbyRoomEnteredEvent event) {
+        update(event.lobbyId(), lobby -> lobby.toBuilder()
+                .initiatorPresent(lobby.initiatorPresent()
+                        || event.playerId().equals(lobby.initiatorId()))
+                .participantPresent(lobby.participantPresent()
+                        || event.playerId().equals(lobby.participantId()))
+                .updatedAt(event.enteredAt())
+                .build());
+    }
+
+    @EventHandler
+    @Transactional
+    public void on(LobbyEvent.LobbyAllPlayersPresentEvent event) {
+        update(event.lobbyId(), lobby -> lobby.toBuilder()
+                .allPresentAt(event.presentAt())
+                .readyDeadlineAt(event.readyDeadlineAt())
+                .updatedAt(event.presentAt())
+                .build());
+    }
+
+    @EventHandler
+    @Transactional
+    public void on(LobbyEvent.LobbyMissedEvent event) {
+        update(event.lobbyId(), lobby -> lobby.toBuilder()
+                .status(LobbyStatus.CLOSED)
+                .missedReason(event.reason())
+                .updatedAt(event.missedAt())
+                .build());
+    }
+
+    @EventHandler
+    @Transactional
+    public void on(LobbyEvent.LobbyLeftEvent event) {
+        update(event.lobbyId(), lobby -> lobby.toBuilder()
+                .initiatorPresent(lobby.initiatorPresent()
+                        && !event.playerId().equals(lobby.initiatorId()))
+                .participantPresent(lobby.participantPresent()
+                        && !event.playerId().equals(lobby.participantId()))
+                .updatedAt(event.leftAt())
+                .build());
+    }
+
+    @EventHandler
+    @Transactional
     public void on(LobbyEvent.LobbyCancelledEvent event) {
         update(event.lobbyId(), lobby -> lobby.toBuilder()
                 .status(LobbyStatus.CLOSED)

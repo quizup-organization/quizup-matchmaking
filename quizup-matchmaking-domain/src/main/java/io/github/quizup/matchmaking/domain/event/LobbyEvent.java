@@ -40,6 +40,37 @@ public interface LobbyEvent {
     ) implements LobbyEvent {
     }
 
+    /** Un joueur entre effectivement dans la salle (présence temps réel, idempotent). */
+    record LobbyRoomEnteredEvent(
+            String lobbyId,
+            String playerId,
+            Instant enteredAt
+    ) implements LobbyEvent {
+    }
+
+    /**
+     * Les deux joueurs sont présents : le compte à rebours de lancement démarre.
+     * {@code readyDeadlineAt} borne le créneau de préparation avant création de la partie.
+     */
+    record LobbyAllPlayersPresentEvent(
+            String lobbyId,
+            Instant readyDeadlineAt,
+            Instant presentAt
+    ) implements LobbyEvent {
+    }
+
+    /**
+     * Un joueur ne s'est jamais présenté (ou a disparu) dans la fenêtre : la salle est close
+     * avec l'issue {@code MISSED} et {@code absentPlayerId} identifie qui manquait.
+     */
+    record LobbyMissedEvent(
+            String lobbyId,
+            String absentPlayerId,
+            String reason,
+            Instant missedAt
+    ) implements LobbyEvent {
+    }
+
     record LobbyLeftEvent(
             String lobbyId,
             String playerId,

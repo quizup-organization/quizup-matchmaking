@@ -20,4 +20,13 @@ public interface LobbyJpaRepository extends JpaRepository<LobbyEntity, String> {
             """)
     List<LobbyEntity> findCreatedByPlayerId(@Param("status") LobbyStatus status,
                                             @Param("playerId") String playerId);
+
+    @Query("""
+            select l from LobbyEntity l
+            where l.status = :status
+              and (l.initiatorId = :playerId or l.participantId = :playerId)
+            order by l.createdAt desc
+            """)
+    List<LobbyEntity> findOpenByPlayerId(@Param("status") LobbyStatus status,
+                                         @Param("playerId") String playerId);
 }

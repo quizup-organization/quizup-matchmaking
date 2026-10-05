@@ -22,6 +22,7 @@ public interface ChallengeEvent {
 
     record ChallengeAcceptedEvent(
             String challengeId,
+            String topicId,
             String challengerId,
             String opponentId,
             Instant acceptedAt

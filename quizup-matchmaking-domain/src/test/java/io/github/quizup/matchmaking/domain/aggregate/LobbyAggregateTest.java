@@ -98,11 +98,49 @@ class LobbyAggregateTest {
 
     @Test
     void complete_closesLobbyWithoutImmediatePurge() {
-        fixture.given(created(), joined())
+        fixture.given(created(), joined(), entered(INITIATOR), entered(PARTICIPANT))
                 .when(new LobbyCommand.CompleteLobbyCommand(LOBBY_ID, "game-1"))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         LobbyEvent.LobbyCompletedEvent.class,
                         e -> "game-1".equals(((LobbyEvent.LobbyCompletedEvent) e).gameId())));
+    }
+
+    @Test
+    void complete_refusedWhenBothPlayersNotPresent() {
+        fixture.given(created(), joined(), entered(INITIATOR))
+                .when(new LobbyCommand.CompleteLobbyCommand(LOBBY_ID, "game-1"))
+                .expectException(LobbyExceptions.ParticipantNotPresentProblem.class);
+    }
+
+    @Test
+    void enter_isIdempotent() {
+        fixture.given(created(), joined(), entered(INITIATOR))
+                .when(new LobbyCommand.EnterLobbyRoomCommand(LOBBY_ID, INITIATOR))
+                .expectNoEvents();
+    }
+
+    @Test
+    void secondEnter_emitsAllPlayersPresent() {
+        fixture.given(created(), joined(), entered(INITIATOR))
+                .when(new LobbyCommand.EnterLobbyRoomCommand(LOBBY_ID, PARTICIPANT))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                        LobbyEvent.LobbyAllPlayersPresentEvent.class, e -> true));
+    }
+
+    @Test
+    void enter_refusedToNonParticipant() {
+        fixture.given(created(), joined())
+                .when(new LobbyCommand.EnterLobbyRoomCommand(LOBBY_ID, "intruder"))
+                .expectException(LobbyExceptions.PlayerNotInLobbyProblem.class);
+    }
+
+    @Test
+    void miss_closesRoom() {
+        fixture.given(created(), joined())
+                .when(new LobbyCommand.MissLobbyCommand(LOBBY_ID, "OPPONENT_OFFLINE", null))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                        LobbyEvent.LobbyMissedEvent.class,
+                        e -> "OPPONENT_OFFLINE".equals(((LobbyEvent.LobbyMissedEvent) e).reason())));
     }
 
     @Test
@@ -142,5 +180,9 @@ class LobbyAggregateTest {
 
     private static LobbyEvent.LobbyJoinedEvent joined() {
         return new LobbyEvent.LobbyJoinedEvent(LOBBY_ID, PARTICIPANT, Instant.now());
+    }
+
+    private static LobbyEvent.LobbyRoomEnteredEvent entered(String playerId) {
+        return new LobbyEvent.LobbyRoomEnteredEvent(LOBBY_ID, playerId, Instant.now());
     }
 }

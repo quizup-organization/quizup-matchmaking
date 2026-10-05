@@ -17,6 +17,11 @@ public final class LobbyEntityMapper {
                 .participantId(entity.getParticipantId())
                 .gameId(entity.getGameId())
                 .status(entity.getStatus())
+                .initiatorPresent(entity.isInitiatorPresent())
+                .participantPresent(entity.isParticipantPresent())
+                .allPresentAt(entity.getAllPresentAt())
+                .readyDeadlineAt(entity.getReadyDeadlineAt())
+                .missedReason(entity.getMissedReason())
                 .createdAt(entity.getCreatedAt())
                 .expiresAt(entity.getExpiresAt())
                 .updatedAt(entity.getUpdatedAt())
@@ -32,6 +37,11 @@ public final class LobbyEntityMapper {
         entity.setParticipantId(lobby.participantId());
         entity.setGameId(lobby.gameId());
         entity.setStatus(lobby.status());
+        entity.setInitiatorPresent(lobby.initiatorPresent());
+        entity.setParticipantPresent(lobby.participantPresent());
+        entity.setAllPresentAt(lobby.allPresentAt());
+        entity.setReadyDeadlineAt(lobby.readyDeadlineAt());
+        entity.setMissedReason(lobby.missedReason());
         entity.setCreatedAt(lobby.createdAt());
         entity.setExpiresAt(lobby.expiresAt());
         entity.setUpdatedAt(lobby.updatedAt());

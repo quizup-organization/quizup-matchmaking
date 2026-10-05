@@ -42,6 +42,8 @@ public class LobbyAggregate {
     private String opponentId;
     private String participantId;
     private LobbyStatus status;
+    private boolean initiatorPresent;
+    private boolean participantPresent;
 
     protected LobbyAggregate() {
     }
@@ -100,6 +102,52 @@ public class LobbyAggregate {
         apply(new LobbyEvent.LobbyJoinedEvent(lobbyId, command.playerId(), Instant.now()));
     }
 
+    /**
+     * Entrée effective dans la salle (présence temps réel). Idempotent ; quand les deux joueurs
+     * sont présents, la salle déclenche le compte à rebours de lancement.
+     */
+    @CommandHandler
+    public void handle(LobbyCommand.EnterLobbyRoomCommand command) {
+        if (isClosed()) {
+            return;
+        }
+        requireParticipant(command.playerId());
+        boolean alreadyPresent = command.playerId().equals(initiatorId)
+                ? initiatorPresent
+                : participantPresent;
+        if (alreadyPresent) {
+            return;
+        }
+        Instant now = Instant.now();
+        apply(new LobbyEvent.LobbyRoomEnteredEvent(lobbyId, command.playerId(), now));
+        if (bothPresent()) {
+            apply(new LobbyEvent.LobbyAllPlayersPresentEvent(
+                    lobbyId,
+                    now.plus(io.github.quizup.matchmaking.domain.model.LobbyDeadline.LOBBY_READY_CHECK_DURATION),
+                    now));
+        }
+    }
+
+    /** Commande interne : un joueur ne s'est jamais présenté / a disparu, la salle est close. */
+    @CommandHandler
+    public void handle(LobbyCommand.MissLobbyCommand command) {
+        if (isClosed()) {
+            return;
+        }
+        String absentPlayerId = StringUtils.isNotBlank(command.absentPlayerId())
+                ? command.absentPlayerId()
+                : computedAbsentPlayerId();
+        apply(new LobbyEvent.LobbyMissedEvent(
+                lobbyId, absentPlayerId, command.reason(), Instant.now()));
+    }
+
+    private String computedAbsentPlayerId() {
+        if (!initiatorPresent) {
+            return initiatorId;
+        }
+        return participantPresent ? null : participantId;
+    }
+
     /** Refus d'un défi nominatif par l'invité : le salon est clos. */
     @CommandHandler
     public void handle(LobbyCommand.DeclineLobbyCommand command) {
@@ -141,7 +189,8 @@ public class LobbyAggregate {
         if (StringUtils.isBlank(command.gameId())) {
             throw new LobbyExceptions.MissingGameIdentifierProblem(lobbyId);
         }
-        if (StringUtils.isBlank(participantId)) {
+        // La partie n'est créée qu'une fois les deux joueurs réellement présents en salle.
+        if (!bothPresent()) {
             throw new LobbyExceptions.ParticipantNotPresentProblem(lobbyId);
         }
         logger.info("Completing lobby: lobbyId={}, gameId={}", lobbyId, command.gameId());
@@ -175,9 +224,14 @@ public class LobbyAggregate {
     // ---------------------------------------------------------------------
 
     private void requireParticipant(String playerId) {
-        if (!playerId.equals(initiatorId) && !playerId.equals(participantId)) {
+        if (StringUtils.isBlank(playerId)
+                || (!playerId.equals(initiatorId) && !playerId.equals(participantId))) {
             throw new LobbyExceptions.PlayerNotInLobbyProblem(lobbyId, playerId);
         }
+    }
+
+    private boolean bothPresent() {
+        return initiatorPresent && participantPresent && StringUtils.isNotBlank(participantId);
     }
 
     /**
@@ -224,6 +278,25 @@ public class LobbyAggregate {
     }
 
     @EventSourcingHandler
+    public void on(LobbyEvent.LobbyRoomEnteredEvent event) {
+        if (event.playerId().equals(initiatorId)) {
+            this.initiatorPresent = true;
+        } else {
+            this.participantPresent = true;
+        }
+    }
+
+    @EventSourcingHandler
+    public void on(LobbyEvent.LobbyAllPlayersPresentEvent event) {
+        // Événement de lancement : l'état des présences est déjà porté par les entrées.
+    }
+
+    @EventSourcingHandler
+    public void on(LobbyEvent.LobbyMissedEvent event) {
+        this.status = LobbyStatus.CLOSED;
+    }
+
+    @EventSourcingHandler
     public void on(LobbyEvent.LobbyDeclinedEvent event) {
         this.status = LobbyStatus.CLOSED;
     }
@@ -235,7 +308,11 @@ public class LobbyAggregate {
 
     @EventSourcingHandler
     public void on(LobbyEvent.LobbyLeftEvent event) {
+        if (event.playerId().equals(initiatorId)) {
+            this.initiatorPresent = false;
+        }
         if (event.playerId().equals(participantId)) {
+            this.participantPresent = false;
             this.participantId = null;
         }
     }

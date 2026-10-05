@@ -43,6 +43,21 @@ public class LobbyEntity {
     @Column(name = "status", nullable = false, length = 20)
     private LobbyStatus status;
 
+    @Column(name = "initiator_present", nullable = false)
+    private boolean initiatorPresent;
+
+    @Column(name = "participant_present", nullable = false)
+    private boolean participantPresent;
+
+    @Column(name = "all_present_at")
+    private Instant allPresentAt;
+
+    @Column(name = "ready_deadline_at")
+    private Instant readyDeadlineAt;
+
+    @Column(name = "missed_reason", length = 64)
+    private String missedReason;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

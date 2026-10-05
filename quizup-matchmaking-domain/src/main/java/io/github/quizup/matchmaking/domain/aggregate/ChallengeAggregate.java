@@ -86,7 +86,8 @@ public class ChallengeAggregate {
         }
         requirePending();
         logger.info("Accepting challenge: challengeId={}, opponentId={}", challengeId, command.playerId());
-        apply(new ChallengeEvent.ChallengeAcceptedEvent(challengeId, challengerId, opponentId, Instant.now()));
+        apply(new ChallengeEvent.ChallengeAcceptedEvent(
+                challengeId, topicId, challengerId, opponentId, Instant.now()));
     }
 
     @CommandHandler

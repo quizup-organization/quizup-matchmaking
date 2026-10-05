@@ -17,6 +17,11 @@ public record Lobby(
         String participantId,
         String gameId,
         LobbyStatus status,
+        boolean initiatorPresent,
+        boolean participantPresent,
+        Instant allPresentAt,
+        Instant readyDeadlineAt,
+        String missedReason,
         Instant createdAt,
         Instant expiresAt,
         Instant updatedAt

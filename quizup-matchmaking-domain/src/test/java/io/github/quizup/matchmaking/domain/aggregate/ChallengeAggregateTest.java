@@ -143,6 +143,6 @@ class ChallengeAggregateTest {
 
     private static ChallengeEvent.ChallengeAcceptedEvent accepted() {
         return new ChallengeEvent.ChallengeAcceptedEvent(
-                CHALLENGE_ID, CHALLENGER, OPPONENT, Instant.now());
+                CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT, Instant.now());
     }
 }

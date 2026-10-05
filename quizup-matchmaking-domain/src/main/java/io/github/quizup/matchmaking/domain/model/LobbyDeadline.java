@@ -9,10 +9,20 @@ public interface LobbyDeadline {
 
     Duration MATCHMAKING_DEADLINE_DURATION = Duration.ofSeconds(5);
 
-    /** Expiration d'un salon privé jamais rejoint. */
+    /** Expiration d'un salon privé jamais rejoint (lien partagé en attente d'un participant). */
     String LOBBY_EXPIRY = "lobby-expiry";
 
     Duration LOBBY_EXPIRY_DURATION = Duration.ofHours(1);
+
+    /** Fenêtre laissée à l'adversaire accepté pour se présenter en salle. */
+    String LOBBY_WAIT_OPPONENT = "lobby-wait-opponent";
+
+    Duration LOBBY_WAIT_OPPONENT_DURATION = Duration.ofMinutes(3);
+
+    /** Compte à rebours avant création de la partie, une fois les deux joueurs présents. */
+    String LOBBY_READY_CHECK = "lobby-ready-check";
+
+    Duration LOBBY_READY_CHECK_DURATION = Duration.ofSeconds(20);
 
     /** Rétention d'un état terminal (annulé/expiré/échoué) avant purge : le client lit l'état. */
     String LOBBY_PURGE = "lobby-purge";

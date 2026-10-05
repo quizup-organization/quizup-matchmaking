@@ -26,6 +26,24 @@ public interface LobbyCommand {
     ) implements LobbyCommand {
     }
 
+    /** Un joueur entre dans la salle (présence temps réel, idempotent). */
+    record EnterLobbyRoomCommand(
+            @TargetAggregateIdentifier String lobbyId,
+            String playerId
+    ) implements LobbyCommand {
+    }
+
+    /**
+     * Commande interne (deadline/présence) : un joueur ne s'est pas présenté, salle close.
+     * {@code absentPlayerId} peut être nul : l'agrégat déduit alors l'absent des présences.
+     */
+    record MissLobbyCommand(
+            @TargetAggregateIdentifier String lobbyId,
+            String reason,
+            String absentPlayerId
+    ) implements LobbyCommand {
+    }
+
     /** L'invité refuse un défi nominatif ; le salon est clos. */
     record DeclineLobbyCommand(
             @TargetAggregateIdentifier String lobbyId,

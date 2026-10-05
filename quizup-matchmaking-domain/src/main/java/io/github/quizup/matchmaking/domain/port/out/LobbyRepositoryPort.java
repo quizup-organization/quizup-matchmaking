@@ -13,5 +13,8 @@ public interface LobbyRepositoryPort {
 
     List<Lobby> findCreatedByPlayerId(String playerId);
 
+    /** Salles encore ouvertes (en attente/présence) où le joueur est impliqué — présence. */
+    List<Lobby> findOpenByPlayerId(String playerId);
+
     void deleteById(String lobbyId);
 }
