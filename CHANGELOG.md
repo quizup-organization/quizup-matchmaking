@@ -1,3 +1,9 @@
+## [4.2.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.2.0...v4.2.1) (2026-10-05)
+
+### Bug Fixes
+
+* **matchmaking:** compte a rebours de lancement a 3 s ([89a511a](https://github.com/quizup-organization/quizup-matchmaking/commit/89a511abd523b99a7e9ff29a01822bd3e097072c))
+
 ## [4.2.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.1.0...v4.2.0) (2026-10-05)
 
 ### Features
