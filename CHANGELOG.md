@@ -1,3 +1,11 @@
+## [4.2.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.1.0...v4.2.0) (2026-10-05)
+
+### Features
+
+* **matchmaking:** agregat Challenge (defi nominatif) — domaine ([ac4ddad](https://github.com/quizup-organization/quizup-matchmaking/commit/ac4ddad54a7e1918620ab229814eb24750ee6597))
+* **matchmaking:** infra Challenge (saga, projection, persistance, services) ([ebba8ee](https://github.com/quizup-organization/quizup-matchmaking/commit/ebba8ee1e94089a0fd7a9399863f3d4abc9efcb6))
+* **matchmaking:** salle temps reel (presence, fenetre 3 min, ready 20 s) ([81500d8](https://github.com/quizup-organization/quizup-matchmaking/commit/81500d87d43d1e58b95db2154842eaa0d9af9de8))
+
 ## [4.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.0.0...v4.1.0) (2026-10-03)
 
 ### Features
