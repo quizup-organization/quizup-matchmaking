@@ -3,7 +3,6 @@ package io.github.quizup.matchmaking.application.service;
 import io.github.quizup.matchmaking.domain.model.Challenge;
 import io.github.quizup.matchmaking.domain.port.in.GetChallengeUseCase;
 import io.github.quizup.matchmaking.domain.query.ChallengeQuery;
-import io.github.quizup.microservice.core.domain.model.notification.EventEnvelope;
 import io.github.quizup.microservice.core.infrastructure.axon.QueryResponseTypes;
 import org.axonframework.queryhandling.QueryGateway;
 import org.springframework.stereotype.Service;
@@ -28,10 +27,5 @@ public class ChallengeQueryService implements GetChallengeUseCase {
     @Override
     public CompletableFuture<List<Challenge>> getMyPending(ChallengeQuery.GetMyChallenges query) {
         return queryGateway.query(query, QueryResponseTypes.multipleInstancesOf(Challenge.class));
-    }
-
-    @Override
-    public CompletableFuture<List<EventEnvelope>> getEvents(ChallengeQuery.GetChallengeEventsQuery query) {
-        return queryGateway.query(query, QueryResponseTypes.multipleInstancesOf(EventEnvelope.class));
     }
 }

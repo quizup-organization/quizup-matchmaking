@@ -10,7 +10,4 @@ public interface ChallengeQuery {
 
     record GetMyChallenges(String playerId) implements ChallengeQuery {
     }
-
-    record GetChallengeEventsQuery(String challengeId) implements ChallengeQuery {
-    }
 }

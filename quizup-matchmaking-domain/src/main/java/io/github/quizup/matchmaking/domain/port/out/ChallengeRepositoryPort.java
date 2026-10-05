@@ -14,6 +14,4 @@ public interface ChallengeRepositoryPort {
 
     /** Défis encore en attente de réponse où le joueur est lanceur ou invité. */
     List<Challenge> findPendingByPlayerId(String playerId);
-
-    void deleteById(String challengeId);
 }

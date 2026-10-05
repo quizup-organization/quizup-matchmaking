@@ -41,10 +41,4 @@ public class ChallengeRepositoryAdapter implements ChallengeRepositoryPort {
                 .map(ChallengeEntityMapper::toDomain)
                 .toList();
     }
-
-    @Override
-    @Transactional
-    public void deleteById(String challengeId) {
-        challengeJpaRepository.deleteById(challengeId);
-    }
 }
