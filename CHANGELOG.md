@@ -1,3 +1,9 @@
+## [4.2.2](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.2.1...v4.2.2) (2026-10-05)
+
+### Bug Fixes
+
+* **matchmaking:** pin theme-domain 4.1.0 (resolution transitoire 4.0.0) ([e6ce6cd](https://github.com/quizup-organization/quizup-matchmaking/commit/e6ce6cdfb3cae92201d73202122153dfae2fd1cf))
+
 ## [4.2.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.2.0...v4.2.1) (2026-10-05)
 
 ### Bug Fixes
