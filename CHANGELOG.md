@@ -1,3 +1,9 @@
+## [4.3.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.2.2...v4.3.0) (2026-10-05)
+
+### Features
+
+* **matchmaking:** sortie non destructive et expiration du salon a 1 jour ([cb8477e](https://github.com/quizup-organization/quizup-matchmaking/commit/cb8477eed5db09403fe362e6bed3b2e31625accc))
+
 ## [4.2.2](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.2.1...v4.2.2) (2026-10-05)
 
 ### Bug Fixes
