@@ -144,12 +144,28 @@ class LobbyAggregateTest {
     }
 
     @Test
-    void leave_cancelsLobby() {
+    void leave_clearsPresenceWithoutClosingRoom() {
+        fixture.given(created(), joined(), entered(INITIATOR), entered(PARTICIPANT))
+                .when(new LobbyCommand.LeaveLobbyCommand(LOBBY_ID, PARTICIPANT))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        LobbyEvent.LobbyLeftEvent.class,
+                        e -> PARTICIPANT.equals(((LobbyEvent.LobbyLeftEvent) e).playerId())));
+    }
+
+    @Test
+    void leave_whenAlreadyAbsent_isNoop() {
         fixture.given(created(), joined())
                 .when(new LobbyCommand.LeaveLobbyCommand(LOBBY_ID, PARTICIPANT))
+                .expectNoEvents();
+    }
+
+    @Test
+    void leaveThenReenter_relaunchesReadyCheck() {
+        fixture.given(created(), joined(), entered(INITIATOR), entered(PARTICIPANT),
+                        new LobbyEvent.LobbyLeftEvent(LOBBY_ID, PARTICIPANT, Instant.now()))
+                .when(new LobbyCommand.EnterLobbyRoomCommand(LOBBY_ID, PARTICIPANT))
                 .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
-                        LobbyEvent.LobbyCancelledEvent.class,
-                        e -> "PLAYER_LEFT".equals(((LobbyEvent.LobbyCancelledEvent) e).reason())));
+                        LobbyEvent.LobbyAllPlayersPresentEvent.class, e -> true));
     }
 
     @Test

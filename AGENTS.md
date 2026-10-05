@@ -19,9 +19,9 @@ Deux responsabilités **distinctes**, chacune avec son agrégat :
   accept/refuse/annule/expire), sans présence ni partie. À l'acceptation, une saga crée la salle.
 - **Salle temps réel** (`LobbyAggregate`) : présence des deux humains (lien partageable
   `/join/{lobbyId}` ou salle issue d'un défi). Chacun **entre** (`EnterLobbyRoom`) ; quand les deux
-  sont présents, un **compte à rebours de 20 s** précède la création de la partie. Fenêtre de
-  présence de **3 min** après acceptation (au-delà : `MISSED`), et un joueur hors ligne ferme ses
-  salles ouvertes (`RoomPresenceHandler`).
+  sont présents, un **compte à rebours de 3 s** précède la création de la partie. Un salon non
+  lancé expire après **1 jour** ; une **sortie explicite est non destructive** (retour possible) et
+  seul un joueur **hors ligne** ferme ses salles ouvertes (`RoomPresenceHandler`).
 
 ### Cycle de vie (statuts réduits)
 
@@ -85,12 +85,15 @@ Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau +
 
 - Création nominative (`opponentId`) : auto-défi interdit (`CannotChallengeSelfProblem`) et garde
   linguistique (`TopicAvailabilityPort` + langues des deux profils) → `TopicNotAvailableInLanguageProblem`.
-- `LobbyCreatedEvent` → expiration planifiée (1 h, lien partagé jamais rejoint).
-- `LobbyJoinedEvent` (2ᵉ humain connu) → **fenêtre de présence 3 min** (`LOBBY_WAIT_OPPONENT`).
-- `LobbyAllPlayersPresentEvent` (les deux entrés) → **compte à rebours 20 s** (`LOBBY_READY_CHECK`).
+- `LobbyCreatedEvent` → expiration planifiée (**1 jour**, seule borne du salon tant que la partie
+  n'est pas lancée ; annulée par les états terminaux).
+- `LobbyJoinedEvent` (2ᵉ humain connu) → l'expiration reste la borne courante.
+- `LobbyAllPlayersPresentEvent` (les deux entrés) → **compte à rebours 3 s** (`LOBBY_READY_CHECK`).
+- `LobbyLeftEvent` (sortie **non destructive**) → compte à rebours annulé ; le joueur peut revenir
+  jusqu'à l'expiration, le participant reste enregistré.
 - Fin du compte à rebours → `CreateGameCommand(HUMAN/HUMAN)` **attendu** (`sendAndWait`, pour
   compenser un échec asynchrone) puis `CompleteLobbyCommand` ; échec → `FailLobbyCommand`.
-- Fenêtre expirée → `MissLobbyCommand` (`MISSED`, absent déduit des présences).
+- Expiration → `ExpireLobbyCommand` (`EXPIRED`).
 - `PlayerWentOfflineEvent` (profile) → `RoomPresenceHandler` ferme les salles ouvertes du joueur.
 - `LobbyCancelled|Declined|Expired|Completed|Failed` → `CLOSED`/`FAILED` + purge planifiée
   (rétention 2 min) ; `LobbyPurgedEvent` termine la saga (`markDeleted`).

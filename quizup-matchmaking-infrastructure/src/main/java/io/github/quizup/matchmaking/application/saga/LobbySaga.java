@@ -29,11 +29,14 @@ import java.util.UUID;
 /**
  * Orchestration de la salle temps réel (deux humains).
  * <ul>
- *   <li>{@code LobbyCreatedEvent} → expiration d'un lien partagé jamais rejoint (1 h).</li>
- *   <li>{@code LobbyJoinedEvent} → fenêtre de présence pour l'adversaire ({@code WAIT_OPPONENT}, 3 min).</li>
- *   <li>{@code LobbyAllPlayersPresentEvent} → compte à rebours de lancement ({@code READY_CHECK}, 20 s).</li>
+ *   <li>{@code LobbyCreatedEvent} → expiration du salon (1 jour) : seule borne tant que la partie
+ *       n'est pas lancée.</li>
+ *   <li>{@code LobbyJoinedEvent} → l'expiration reste la borne courante du salon.</li>
+ *   <li>{@code LobbyAllPlayersPresentEvent} → compte à rebours de lancement ({@code READY_CHECK}, 3 s).</li>
  *   <li>Fin du compte à rebours → création de la partie (2 humains) puis clôture de la salle.</li>
- *   <li>Fenêtre expirée → {@code MissLobby} ; un joueur disparaît → {@code MissLobby} (présence).</li>
+ *   <li>{@code LobbyLeftEvent} (sortie non destructive) → compte à rebours annulé ; retour possible
+ *       jusqu'à l'expiration du salon.</li>
+ *   <li>Un joueur hors ligne → {@code MissLobby} (présence) ; expiration → {@code ExpireLobby}.</li>
  *   <li>États terminaux → purge après rétention ; {@code LobbyPurgedEvent} termine la saga.</li>
  * </ul>
  * Aucune notion de bot ici.
@@ -75,10 +78,6 @@ public class LobbySaga {
 
     @Getter
     @Setter
-    private String waitDeadlineId;
-
-    @Getter
-    @Setter
     private String readyDeadlineId;
 
     @Getter
@@ -98,23 +97,18 @@ public class LobbySaga {
                 LobbyDeadline.LOBBY_EXPIRY_DURATION.toHours(), lobbyId);
     }
 
+    /**
+     * Salon rejoint : l'expiration du salon ({@code LOBBY_EXPIRY_DURATION}) reste la seule borne
+     * tant que la partie n'est pas lancée ; elle est annulée par les états terminaux.
+     */
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyJoinedEvent event) {
         this.participantId = event.participantId();
-        cancelExpiryDeadline();
-        // L'adversaire est connu : on lui laisse une fenêtre courte pour se présenter en salle.
-        if (waitDeadlineId == null) {
-            waitDeadlineId = deadlineManager.schedule(
-                    LobbyDeadline.LOBBY_WAIT_OPPONENT_DURATION,
-                    LobbyDeadline.LOBBY_WAIT_OPPONENT);
-        }
-        logger.info("Salon rejoint, fenêtre de présence de {} min: lobbyId={}",
-                LobbyDeadline.LOBBY_WAIT_OPPONENT_DURATION.toMinutes(), lobbyId);
+        logger.info("Salon rejoint: lobbyId={}, participantId={}", lobbyId, event.participantId());
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyAllPlayersPresentEvent event) {
-        cancelWaitDeadline();
         if (readyDeadlineId == null) {
             readyDeadlineId = deadlineManager.schedule(
                     LobbyDeadline.LOBBY_READY_CHECK_DURATION,
@@ -124,10 +118,15 @@ public class LobbySaga {
                 LobbyDeadline.LOBBY_READY_CHECK_DURATION.toSeconds(), lobbyId);
     }
 
-    @DeadlineHandler(deadlineName = LobbyDeadline.LOBBY_WAIT_OPPONENT)
-    public void onWaitOpponentExpired() {
-        logger.info("Adversaire absent de la salle: lobbyId={}", lobbyId);
-        commandGateway.send(new LobbyCommand.MissLobbyCommand(lobbyId, "OPPONENT_OFFLINE", null));
+    /**
+     * Sortie d'un joueur (non destructive) : le compte à rebours de lancement est annulé ; le
+     * salon reste ouvert jusqu'à son expiration, le joueur peut revenir entre-temps.
+     */
+    @SagaEventHandler(associationProperty = "lobbyId")
+    public void on(LobbyEvent.LobbyLeftEvent event) {
+        cancelReadyDeadline();
+        logger.info("Joueur sorti de la salle (retour possible jusqu'à l'expiration): lobbyId={}, playerId={}",
+                lobbyId, event.playerId());
     }
 
     @DeadlineHandler(deadlineName = LobbyDeadline.LOBBY_READY_CHECK)
@@ -167,37 +166,37 @@ public class LobbySaga {
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyCancelledEvent event) {
-        cancelAllWaitDeadlines();
+        cancelReadyDeadline();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyDeclinedEvent event) {
-        cancelAllWaitDeadlines();
+        cancelReadyDeadline();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyExpiredEvent event) {
-        cancelAllWaitDeadlines();
+        cancelReadyDeadline();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyFailedEvent event) {
-        cancelAllWaitDeadlines();
+        cancelReadyDeadline();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyMissedEvent event) {
-        cancelAllWaitDeadlines();
+        cancelReadyDeadline();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "lobbyId")
     public void on(LobbyEvent.LobbyCompletedEvent event) {
-        cancelAllWaitDeadlines();
+        cancelReadyDeadline();
         schedulePurge();
     }
 
@@ -223,29 +222,17 @@ public class LobbySaga {
 
     private void cancelAllDeadlines() {
         cancelExpiryDeadline();
-        cancelAllWaitDeadlines();
+        cancelReadyDeadline();
         if (purgeDeadlineId != null) {
             deadlineManager.cancelSchedule(LobbyDeadline.LOBBY_PURGE, purgeDeadlineId);
             purgeDeadlineId = null;
         }
     }
 
-    private void cancelAllWaitDeadlines() {
-        cancelWaitDeadline();
-        cancelReadyDeadline();
-    }
-
     private void cancelExpiryDeadline() {
         if (expiryDeadlineId != null) {
             deadlineManager.cancelSchedule(LobbyDeadline.LOBBY_EXPIRY, expiryDeadlineId);
             expiryDeadlineId = null;
-        }
-    }
-
-    private void cancelWaitDeadline() {
-        if (waitDeadlineId != null) {
-            deadlineManager.cancelSchedule(LobbyDeadline.LOBBY_WAIT_OPPONENT, waitDeadlineId);
-            waitDeadlineId = null;
         }
     }
 

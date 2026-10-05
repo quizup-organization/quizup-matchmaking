@@ -161,15 +161,24 @@ public class LobbyAggregate {
         apply(new LobbyEvent.LobbyDeclinedEvent(lobbyId, initiatorId, opponentId, Instant.now()));
     }
 
+    /**
+     * Sortie **non destructive** : le joueur quitte la salle mais le salon reste ouvert (il peut
+     * y revenir via son lien ou l'inbox). Seule {@code CancelLobbyCommand} (initiateur) ferme
+     * le salon ; un joueur hors ligne reste fermé par {@code RoomPresenceHandler}.
+     */
     @CommandHandler
     public void handle(LobbyCommand.LeaveLobbyCommand command) {
         if (isClosed()) {
             return;
         }
         requireParticipant(command.playerId());
-        Instant now = Instant.now();
-        apply(new LobbyEvent.LobbyLeftEvent(lobbyId, command.playerId(), now));
-        apply(new LobbyEvent.LobbyCancelledEvent(lobbyId, initiatorId, "PLAYER_LEFT", now));
+        boolean alreadyAbsent = command.playerId().equals(initiatorId)
+                ? !initiatorPresent
+                : !participantPresent;
+        if (alreadyAbsent) {
+            return;
+        }
+        apply(new LobbyEvent.LobbyLeftEvent(lobbyId, command.playerId(), Instant.now()));
     }
 
     @CommandHandler
@@ -308,12 +317,11 @@ public class LobbyAggregate {
 
     @EventSourcingHandler
     public void on(LobbyEvent.LobbyLeftEvent event) {
+        // Le participant reste enregistré : il peut revenir (ré-entrée dans la salle).
         if (event.playerId().equals(initiatorId)) {
             this.initiatorPresent = false;
-        }
-        if (event.playerId().equals(participantId)) {
+        } else if (event.playerId().equals(participantId)) {
             this.participantPresent = false;
-            this.participantId = null;
         }
     }
 
