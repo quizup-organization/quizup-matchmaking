@@ -1,3 +1,14 @@
+## [4.5.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.5.0...v4.5.1) (2026-10-07)
+
+### Bug Fixes
+
+* **deps:** pin versions publiées (game 5.2.0, profile 3.1.0, theme 4.5.2) ([aa2c816](https://github.com/quizup-organization/quizup-matchmaking/commit/aa2c8162a39a44c09ad2ea59a769f9a489b2fe57))
+
+### Reverts
+
+* Revert "feat(matchmaking): lobby, challenge et timers en redis (store chaud, ready-check durable)" ([010e8bb](https://github.com/quizup-organization/quizup-matchmaking/commit/010e8bb0f7104b4928bcbde3c0e5e430b94d5481))
+* Revert "feat(matchmaking): tickets et appariement public en redis (store chaud + outbox)" ([ea3a2ff](https://github.com/quizup-organization/quizup-matchmaking/commit/ea3a2ffcbf79bdde6021e89419c3e46fdf376f75))
+
 ## [4.5.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.4.0...v4.5.0) (2026-10-07)
 
 ### Features
