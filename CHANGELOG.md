@@ -1,3 +1,9 @@
+## [4.4.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.3.0...v4.4.0) (2026-10-07)
+
+### Features
+
+* **matchmaking:** tickets et appariement public en redis (store chaud + outbox) ([6a7a15b](https://github.com/quizup-organization/quizup-matchmaking/commit/6a7a15b87802566390be57d46cbd46f07ee997ec))
+
 ## [4.3.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.2.2...v4.3.0) (2026-10-05)
 
 ### Features
