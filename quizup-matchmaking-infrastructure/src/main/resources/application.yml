@@ -14,6 +14,14 @@ spring:
       ddl-auto: validate
     open-in-view: false
 
+  data:
+    redis:
+      # Session tier : tickets, salons, défis, timers et outbox (sans auth in-cluster).
+      host: ${QUIZUP_REDIS_HOST:localhost}
+      port: ${QUIZUP_REDIS_PORT:6379}
+      connect-timeout: 2s
+      timeout: 2s
+
 microservice:
   swagger:
     description: QuizUp Matchmaking Module - Lobby-based player matching

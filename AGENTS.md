@@ -12,11 +12,15 @@
 
 Deux responsabilités **distinctes**, chacune avec son agrégat :
 
-- **Appariement public** (`MatchmakingAggregate`) : trouve un adversaire pour un sujet
+- **Appariement public** (store chaud Redis) : trouve un adversaire pour un sujet
   (même thème, niveau ±5, langues **en union** couvertes par le thème) ; à l'échéance de **5 s**
   sans adversaire, crée une **partie bot**. Le bot n'est jamais un participant du salon.
+  Plus d'agrégat event-sourcé : tickets et file d'attente vivent dans Redis (TTL, claim Lua
+  atomique), les timers sont durables (ZSET) et les événements passent par une **outbox** →
+  bus Axon (historique `…/notifications` et notifications BFF inchangés).
 - **Défi nominatif** (`ChallengeAggregate`) : intention **asynchrone** « A défie B » (TTL 1 h,
   accept/refuse/annule/expire), sans présence ni partie. À l'acceptation, une saga crée la salle.
+  *(Bascule Redis à venir — lot suivant : lobby/challenge.)*
 - **Salle temps réel** (`LobbyAggregate`) : présence des deux humains (lien partageable
   `/join/{lobbyId}` ou salle issue d'un défi). Chacun **entre** (`EnterLobbyRoom`) ; quand les deux
   sont présents, un **compte à rebours de 3 s** précède la création de la partie. Un salon non
@@ -70,16 +74,19 @@ Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau +
 **Ports sortants locaux** : `MatchmakingPoolPort`, `MatchmakingRepositoryPort`,
 `MatchmakingEventStorePort`, `LobbyRepositoryPort`, `LobbyEventStorePort`.
 
-### Appariement public (`MatchmakingSaga`)
+### Appariement public (`MatchmakingService`)
 
-- `MatchmakingStartedEvent` → planifie une deadline **5 s** ; **le dernier arrivé** initie le
-  pairage : `MatchmakingPoolPort.candidates` (même sujet, niveau ±5, plus anciens), filtre par
-  langues (`TopicAvailabilityPort`), `claim` atomique, `CreateGameCommand(HUMAN/HUMAN)` puis
-  `MarkMatchmakingMatchedCommand` des deux tickets.
-- Deadline atteinte sans adversaire → `CreateGameCommand(BOT)` + `MarkMatchmakingMatchedCommand(vsBot=true)`.
-- Échec de création de partie → `FailMatchmakingCommand` (les deux tickets).
-- **`MatchmakingPoolPort`** isole l'index de recherche (implémentation Postgres ; un adaptateur
-  Redis pourra le remplacer sans changer le domaine ; l'agrégat reste la source de vérité).
+- `CreateMatchmakingCommand` → enfile le ticket (Redis) et **le dernier arrivé initie le
+  pairage** : candidats plus anciens du même sujet (niveau ±5), filtre langues
+  (`TopicAvailabilityPort`), **claim atomique Lua** de la paire, `CreateGameCommand(HUMAN/HUMAN)`
+  puis finalisation des deux tickets + événements outbox.
+- Timer `MATCHMAKING_DEADLINE` (5 s) → `CreateGameCommand(BOT)` si le ticket cherche encore ;
+  échec de création → `FAILED` + `MatchmakingFailedEvent` (les deux tickets pour une paire).
+- Annulation (`CancelMatchmakingCommand`) : atomique, uniquement tant que `SEARCHING`.
+- `SessionTimerWorker` (ZSET `session:timers`) et `SessionOutboxRelay` (liste `session:outbox`
+  → `EventGateway`, `DomainEventMessage` avec agrégat + séquence) portent l'orchestration.
+- **`MatchmakingStorePort` / `SessionTimerPort` / `SessionOutboxPort`** isolent le store chaud ;
+  l'agrégat n'est plus la source de vérité (Redis l'est), les événements restent la trace durable.
 
 ### Salon privé (`LobbySaga`)
 
@@ -111,7 +118,8 @@ Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau +
   `/topic/lobbies/{lobbyId}` (`LOBBY_CREATED|JOINED|DECLINED|COMPLETED|CANCELLED|EXPIRED|FAILED`).
 - **Notifications personnelles** : consommées par `quizup-notification` depuis le bus Kafka ;
   poussées par le BFF sur `/topic/notifications/{userId}`.
-- Read models : `matchmaking_entry` (pool + ticket), `lobby_entry` (salon). L'agrégat reste la
-  source de vérité ; le pool est reconstructible à partir des `MatchmakingStartedEvent`.
+- Read models : **Redis** (`session:mm:ticket:*`, `session:mm:queue:*` — tickets et file
+  d'appariement, TTL 10 min) ; `lobby_entry` (salon, v1 Axon). L'historique d'événements reste
+  l'event store Axon (alimenté par l'outbox), lisible via `GET .../notifications`.
 - Statuts : matchmaking `SEARCHING|CLOSED|FAILED` ; salon `CREATED|CLOSED|FAILED`
   (rétention puis purge).
