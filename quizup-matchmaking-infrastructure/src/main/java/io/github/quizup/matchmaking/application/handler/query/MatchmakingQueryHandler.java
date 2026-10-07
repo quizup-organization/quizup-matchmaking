@@ -3,7 +3,7 @@ package io.github.quizup.matchmaking.application.handler.query;
 import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
 import io.github.quizup.matchmaking.domain.model.Matchmaking;
 import io.github.quizup.matchmaking.domain.port.out.MatchmakingEventStorePort;
-import io.github.quizup.matchmaking.domain.port.out.MatchmakingStorePort;
+import io.github.quizup.matchmaking.domain.port.out.MatchmakingRepositoryPort;
 import io.github.quizup.matchmaking.domain.query.MatchmakingQuery;
 import io.github.quizup.microservice.core.domain.model.notification.EventEnvelope;
 import org.axonframework.queryhandling.QueryHandler;
@@ -14,18 +14,18 @@ import java.util.List;
 @Component
 public class MatchmakingQueryHandler {
 
-    private final MatchmakingStorePort matchmakingStorePort;
+    private final MatchmakingRepositoryPort matchmakingRepositoryPort;
     private final MatchmakingEventStorePort matchmakingEventStorePort;
 
-    public MatchmakingQueryHandler(MatchmakingStorePort matchmakingStorePort,
+    public MatchmakingQueryHandler(MatchmakingRepositoryPort matchmakingRepositoryPort,
                                    MatchmakingEventStorePort matchmakingEventStorePort) {
-        this.matchmakingStorePort = matchmakingStorePort;
+        this.matchmakingRepositoryPort = matchmakingRepositoryPort;
         this.matchmakingEventStorePort = matchmakingEventStorePort;
     }
 
     @QueryHandler
     public Matchmaking handle(MatchmakingQuery.GetMatchmakingByIdQuery query) {
-        return matchmakingStorePort.findById(query.matchmakingId())
+        return matchmakingRepositoryPort.findById(query.matchmakingId())
                 .orElseThrow(() -> new LobbyExceptions.MatchmakingNotFoundProblem(query.matchmakingId()));
     }
 
