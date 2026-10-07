@@ -3,7 +3,7 @@ package io.github.quizup.matchmaking.application.handler.query;
 import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
 import io.github.quizup.matchmaking.domain.model.Lobby;
 import io.github.quizup.matchmaking.domain.port.out.LobbyEventStorePort;
-import io.github.quizup.matchmaking.domain.port.out.LobbyRepositoryPort;
+import io.github.quizup.matchmaking.domain.port.out.LobbyStorePort;
 import io.github.quizup.matchmaking.domain.query.LobbyQuery;
 import io.github.quizup.microservice.core.domain.model.notification.EventEnvelope;
 import org.axonframework.queryhandling.QueryHandler;
@@ -14,24 +14,24 @@ import java.util.List;
 @Component
 public class LobbyQueryHandler {
 
-    private final LobbyRepositoryPort lobbyRepositoryPort;
+    private final LobbyStorePort lobbyStorePort;
     private final LobbyEventStorePort lobbyEventStorePort;
 
-    public LobbyQueryHandler(LobbyRepositoryPort lobbyRepositoryPort,
+    public LobbyQueryHandler(LobbyStorePort lobbyStorePort,
                              LobbyEventStorePort lobbyEventStorePort) {
-        this.lobbyRepositoryPort = lobbyRepositoryPort;
+        this.lobbyStorePort = lobbyStorePort;
         this.lobbyEventStorePort = lobbyEventStorePort;
     }
 
     @QueryHandler
     public Lobby handle(LobbyQuery.GetLobbyById query) {
-        return lobbyRepositoryPort.findById(query.lobbyId())
+        return lobbyStorePort.findById(query.lobbyId())
                 .orElseThrow(() -> new LobbyExceptions.LobbyNotFoundProblem(query.lobbyId()));
     }
 
     @QueryHandler
     public List<Lobby> handle(LobbyQuery.GetMyOpenLobbies query) {
-        return lobbyRepositoryPort.findCreatedByPlayerId(query.playerId());
+        return lobbyStorePort.findOpenByPlayerId(query.playerId());
     }
 
     @QueryHandler

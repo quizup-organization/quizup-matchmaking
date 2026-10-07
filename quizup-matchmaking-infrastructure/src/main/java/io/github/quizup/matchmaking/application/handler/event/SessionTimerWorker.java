@@ -1,5 +1,7 @@
 package io.github.quizup.matchmaking.application.handler.event;
 
+import io.github.quizup.matchmaking.application.service.ChallengeService;
+import io.github.quizup.matchmaking.application.service.LobbyService;
 import io.github.quizup.matchmaking.application.service.MatchmakingService;
 import io.github.quizup.matchmaking.domain.model.SessionTimer;
 import io.github.quizup.matchmaking.domain.port.out.SessionTimerPort;
@@ -24,10 +26,17 @@ public class SessionTimerWorker {
 
     private final SessionTimerPort timerPort;
     private final MatchmakingService matchmakingService;
+    private final LobbyService lobbyService;
+    private final ChallengeService challengeService;
 
-    public SessionTimerWorker(SessionTimerPort timerPort, MatchmakingService matchmakingService) {
+    public SessionTimerWorker(SessionTimerPort timerPort,
+                              MatchmakingService matchmakingService,
+                              LobbyService lobbyService,
+                              ChallengeService challengeService) {
         this.timerPort = timerPort;
         this.matchmakingService = matchmakingService;
+        this.lobbyService = lobbyService;
+        this.challengeService = challengeService;
     }
 
     @Scheduled(fixedDelayString = "${app.session.timer-interval-ms:500}")
@@ -45,6 +54,9 @@ public class SessionTimerWorker {
     private void dispatch(SessionTimer.Due timer) {
         switch (timer.type()) {
             case SessionTimer.MATCHMAKING_DEADLINE -> matchmakingService.onDeadline(timer.referenceId());
+            case SessionTimer.LOBBY_READY_CHECK -> lobbyService.onReadyCheck(timer.referenceId());
+            case SessionTimer.LOBBY_EXPIRY -> lobbyService.expire(timer.referenceId());
+            case SessionTimer.CHALLENGE_EXPIRY -> challengeService.expire(timer.referenceId());
             default -> logger.warn("Timer sans handler: type={}, ref={}", timer.type(), timer.referenceId());
         }
     }
