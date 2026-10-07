@@ -18,10 +18,10 @@ Deux responsabilités **distinctes**, chacune avec son agrégat :
   Plus d'agrégat event-sourcé : tickets et file d'attente vivent dans Redis (TTL, claim Lua
   atomique), les timers sont durables (ZSET) et les événements passent par une **outbox** →
   bus Axon (historique `…/notifications` et notifications BFF inchangés).
-- **Défi nominatif** (store chaud Redis) : intention **asynchrone** « A défie B » (TTL 1 h,
-  accept/refuse/annule/expire), sans présence ni partie. À l'acceptation, la salle temps réel est
-  créée (id déterministe) et reliée au défi.
-- **Salle temps réel** (store chaud Redis) : présence des deux humains (lien partageable
+- **Défi nominatif** (`ChallengeAggregate`) : intention **asynchrone** « A défie B » (TTL 1 h,
+  accept/refuse/annule/expire), sans présence ni partie. À l'acceptation, une saga crée la salle.
+  *(Bascule Redis à venir — lot suivant : lobby/challenge.)*
+- **Salle temps réel** (`LobbyAggregate`) : présence des deux humains (lien partageable
   `/join/{lobbyId}` ou salle issue d'un défi). Chacun **entre** (`EnterLobbyRoom`) ; quand les deux
   sont présents, un **compte à rebours de 3 s** précède la création de la partie. Un salon non
   lancé expire après **1 jour** ; une **sortie explicite est non destructive** (retour possible) et
@@ -29,17 +29,16 @@ Deux responsabilités **distinctes**, chacune avec son agrégat :
 
 ### Cycle de vie (statuts réduits)
 
-Les états du session tier sont **éphémères** : statuts réduits au cycle de vie et **TTL Redis**
-(rétention native, plus de purge ni d'agrégat supprimé).
+Les deux agrégats sont **éphémères** : statuts réduits au cycle de vie et suppression différée.
 
-- `MatchmakingStatus = SEARCHING | CLOSED | FAILED` ; `LobbyStatus = CREATED | CLOSED | FAILED` ;
-  `ChallengeStatus = PENDING | ACCEPTED | DECLINED | CANCELLED | EXPIRED`.
+- `MatchmakingStatus = SEARCHING | CLOSED | FAILED` ; `LobbyStatus = CREATED | CLOSED | FAILED`.
 - `CLOSED` = fin normale (partie créée, annulée, refusée, expirée) ; `FAILED` = échec système
   (création de partie impossible). L'issue exacte est portée par l'événement terminal et la
   notification.
-- **Rétention** : tickets ~10 min, salons ouverts 1 jour puis 2 min après clôture, défis 1 h.
-  Toute transition terminale écrit son événement dans l'**outbox** → bus Axon : l'event store
-  conserve l'historique (`GET .../notifications` reste lisible après expiration du TTL).
+- **Aucune suppression immédiate** : l'agrégat reste joignable pendant la **rétention**
+  (`LOBBY_PURGE` / `MATCHMAKING_PURGE`, 2 min) puis la saga envoie la commande de purge ;
+  `markDeleted()` est appelé dans l'`@EventSourcingHandler` du `*PurgedEvent` (standard Axon).
+  L'event store conserve l'historique (`GET .../notifications` reste lisible après purge).
 
 **Package** : `io.github.quizup.matchmaking`
 
@@ -49,8 +48,8 @@ Les états du session tier sont **éphémères** : statuts réduits au cycle de 
 
 Service **headless** : aucun contrôleur REST ni WebSocket. La surface applicative unique est le
 **`quizup-bff`** (`/api/**` + `/ws`) ; il interroge ce service via le **query bus** Axon et consomme
-ses événements. Les handlers de requête/commande, le worker de timers et le relais d'outbox
-restent la seule surface exposée par le service.
+ses événements. Les handlers de requête/commande, sagas et projections restent la seule surface
+exposée par le service.
 
 ## 3. Use cases (ports entrants — `domain/port/in/`)
 
@@ -72,9 +71,8 @@ restent la seule surface exposée par le service.
 Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau + pays),
 `TopicAvailabilityService` (couverture des langues), `PlayerService`.
 
-**Ports sortants locaux** : `MatchmakingStorePort`, `LobbyStorePort`, `ChallengeStorePort`
-(store chaud Redis), `SessionTimerPort`, `SessionOutboxPort`, `MatchmakingEventStorePort`,
-`LobbyEventStorePort`.
+**Ports sortants locaux** : `MatchmakingPoolPort`, `MatchmakingRepositoryPort`,
+`MatchmakingEventStorePort`, `LobbyRepositoryPort`, `LobbyEventStorePort`.
 
 ### Appariement public (`MatchmakingService`)
 
@@ -90,31 +88,24 @@ Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau +
 - **`MatchmakingStorePort` / `SessionTimerPort` / `SessionOutboxPort`** isolent le store chaud ;
   l'agrégat n'est plus la source de vérité (Redis l'est), les événements restent la trace durable.
 
-### Salon privé (`LobbyService`)
+### Salon privé (`LobbySaga`)
 
 - Création nominative (`opponentId`) : auto-défi interdit (`CannotChallengeSelfProblem`) et garde
   linguistique (`TopicAvailabilityPort` + langues des deux profils) → `TopicNotAvailableInLanguageProblem`.
-- Expiration planifiée (**1 jour**, TTL Redis + timer `LOBBY_EXPIRY`, seule borne tant que la
-  partie n'est pas lancée).
-- `Join` (idempotent) : nominatif → invité uniquement (`LobbyNotInvitedProblem`, 403 sinon) ;
-  salon partagé → premier arrivé (`LobbyAlreadyFullProblem` au-delà).
-- Entrée en salle (`EnterLobbyRoom`, idempotente) : quand les deux sont présents → **compte à
-  rebours 3 s** (`LOBBY_READY_CHECK`, timer reprogrammé à chaque ré-entrée).
-- Fin du compte à rebours → `CreateGameCommand(HUMAN/HUMAN)` **attendu** (`sendAndWait`) puis
-  clôture du salon ; échec → `FAILED` (`GAME_CREATION_FAILED`).
-- Sortie **non destructive** : présence retirée, salon toujours `CREATED`, retour possible
-  jusqu'à l'expiration (un timer ready devenu obsolète est un no-op).
-- Expiration → `CLOSED` (`EXPIRED`).
+- `LobbyCreatedEvent` → expiration planifiée (**1 jour**, seule borne du salon tant que la partie
+  n'est pas lancée ; annulée par les états terminaux).
+- `LobbyJoinedEvent` (2ᵉ humain connu) → l'expiration reste la borne courante.
+- `LobbyAllPlayersPresentEvent` (les deux entrés) → **compte à rebours 3 s** (`LOBBY_READY_CHECK`).
+- `LobbyLeftEvent` (sortie **non destructive**) → compte à rebours annulé ; le joueur peut revenir
+  jusqu'à l'expiration, le participant reste enregistré.
+- Fin du compte à rebours → `CreateGameCommand(HUMAN/HUMAN)` **attendu** (`sendAndWait`, pour
+  compenser un échec asynchrone) puis `CompleteLobbyCommand` ; échec → `FailLobbyCommand`.
+- Expiration → `ExpireLobbyCommand` (`EXPIRED`).
 - `PlayerWentOfflineEvent` (profile) → `RoomPresenceHandler` ferme les salles ouvertes du joueur.
-- États terminaux → `CLOSED`/`FAILED` + **rétention TTL 2 min** dans Redis (pas de purge saga).
-
-### Défi nominatif (`ChallengeService`)
-
-- Création : auto-défi interdit, garde linguistique, TTL **1 h** (timer `CHALLENGE_EXPIRY`).
-- Acceptation (invité uniquement, idempotente) → salle créée (id déterministe `room:<challengeId>`),
-  invité marqué comme participant (`JoinLobby`) puis `roomId` relié au défi
-  (`ChallengeRoomCreatedEvent`).
-- Refus/annulation → états terminaux (rétention native TTL), expiration par timer si `PENDING`.
+- `LobbyCancelled|Declined|Expired|Completed|Failed` → `CLOSED`/`FAILED` + purge planifiée
+  (rétention 2 min) ; `LobbyPurgedEvent` termine la saga (`markDeleted`).
+- **`MatchmakingPoolPort`** : le claim n'écrit plus de statut (uniquement `claimed_by`), le statut
+  reste `SEARCHING` jusqu'à la projection du `Matched`.
 
 ### Contrats BFF
 
@@ -127,8 +118,8 @@ Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau +
   `/topic/lobbies/{lobbyId}` (`LOBBY_CREATED|JOINED|DECLINED|COMPLETED|CANCELLED|EXPIRED|FAILED`).
 - **Notifications personnelles** : consommées par `quizup-notification` depuis le bus Kafka ;
   poussées par le BFF sur `/topic/notifications/{userId}`.
-- Read models : **Redis** (`session:mm:ticket:*`, `session:mm:queue:*`, `session:lobby:*`,
-  `session:challenge:*` — TTL natifs) ; l'historique d'événements reste l'event store Axon
-  (alimenté par l'outbox), lisible via `GET .../notifications`.
+- Read models : **Redis** (`session:mm:ticket:*`, `session:mm:queue:*` — tickets et file
+  d'appariement, TTL 10 min) ; `lobby_entry` (salon, v1 Axon). L'historique d'événements reste
+  l'event store Axon (alimenté par l'outbox), lisible via `GET .../notifications`.
 - Statuts : matchmaking `SEARCHING|CLOSED|FAILED` ; salon `CREATED|CLOSED|FAILED`
   (rétention puis purge).
