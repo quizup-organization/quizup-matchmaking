@@ -1,3 +1,9 @@
+## [4.5.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.4.0...v4.5.0) (2026-10-07)
+
+### Features
+
+* **matchmaking:** lobby, challenge et timers en redis (store chaud, ready-check durable) ([bc0383f](https://github.com/quizup-organization/quizup-matchmaking/commit/bc0383fe828691b3a90bc41f11d9e514cb71ab1e))
+
 ## [4.4.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.3.0...v4.4.0) (2026-10-07)
 
 ### Features
