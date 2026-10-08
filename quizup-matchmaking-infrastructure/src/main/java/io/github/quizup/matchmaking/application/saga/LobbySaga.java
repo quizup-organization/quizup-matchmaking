@@ -2,6 +2,7 @@ package io.github.quizup.matchmaking.application.saga;
 
 import io.github.quizup.game.domain.command.GameCommand;
 import io.github.quizup.game.domain.model.GamePlayerType;
+import io.github.quizup.game.domain.model.PlayerProgressSnapshot;
 import io.github.quizup.matchmaking.domain.command.LobbyCommand;
 import io.github.quizup.matchmaking.domain.event.LobbyEvent;
 import io.github.quizup.matchmaking.domain.model.LobbyDeadline;
@@ -149,7 +150,9 @@ public class LobbySaga {
                     participant.playerName(),
                     languagesOf(initiator, participant),
                     GamePlayerType.HUMAN,
-                    null));
+                    null,
+                    new PlayerProgressSnapshot(initiator.level(), initiator.xpTotal()),
+                    new PlayerProgressSnapshot(participant.level(), participant.xpTotal())));
             commandGateway.send(new LobbyCommand.CompleteLobbyCommand(lobbyId, gameId));
             logger.info("Partie créée depuis la salle: lobbyId={}, gameId={}", lobbyId, gameId);
         } catch (Exception exception) {

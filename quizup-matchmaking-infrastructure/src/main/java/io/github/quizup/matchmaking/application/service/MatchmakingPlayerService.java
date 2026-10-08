@@ -33,6 +33,7 @@ public class MatchmakingPlayerService implements MatchmakingPlayerPort {
         String country = null;
         Language language = null;
         int level = 1;
+        int xpTotal = 0;
 
         try {
             Profile profile = queryGateway.query(
@@ -52,10 +53,11 @@ public class MatchmakingPlayerService implements MatchmakingPlayerPort {
                     QueryResponseTypes.instanceOf(PlayerProgress.class)
             ).join();
             level = Math.max(1, progress.level());
+            xpTotal = Math.max(0, progress.xpTotal());
         } catch (Exception exception) {
             logger.warn("Progression introuvable pour {} : {}", userId, exception.getMessage());
         }
 
-        return new PlayerSummary(userId, pseudonym, level, country, language);
+        return new PlayerSummary(userId, pseudonym, level, xpTotal, country, language);
     }
 }

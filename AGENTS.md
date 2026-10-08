@@ -69,7 +69,7 @@ exposée par le service.
 | `MatchmakingPlayerPort`           | `quizup-profile`  | `ProfileQuery.GetProfileQuery` + `ProgressionQuery.GetProgressionQuery` |
 | `TopicAvailabilityPort`           | `quizup-theme`    | `QuestionQuery.CountApprovedQuestionsByTopicAndLanguagesQuery` |
 
-Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau + pays),
+Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau + XP + pays),
 `TopicAvailabilityService` (couverture des langues), `PlayerService`.
 
 **Ports sortants locaux** : `MatchmakingPoolPort`, `MatchmakingRepositoryPort`,

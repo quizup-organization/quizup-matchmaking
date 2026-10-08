@@ -2,6 +2,7 @@ package io.github.quizup.matchmaking.application.saga;
 
 import io.github.quizup.game.domain.command.GameCommand;
 import io.github.quizup.game.domain.model.GamePlayerType;
+import io.github.quizup.game.domain.model.PlayerProgressSnapshot;
 import io.github.quizup.matchmaking.domain.command.MatchmakingCommand;
 import io.github.quizup.matchmaking.domain.event.MatchmakingEvent;
 import io.github.quizup.matchmaking.domain.model.LobbyDeadline;
@@ -151,7 +152,9 @@ public class MatchmakingSaga {
                     nameOf(opponent),
                     union,
                     GamePlayerType.HUMAN,
-                    null));
+                    null,
+                    new PlayerProgressSnapshot(me.level(), me.xpTotal()),
+                    new PlayerProgressSnapshot(opponent.level(), opponent.xpTotal())));
             commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
                     matchmakingId, candidate.playerId(), gameId, false));
             commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
@@ -183,7 +186,9 @@ public class MatchmakingSaga {
                     QuizUpConstants.SYSTEM_USER_NAME,
                     languages == null ? Set.of() : Set.copyOf(languages),
                     GamePlayerType.BOT,
-                    null));
+                    null,
+                    new PlayerProgressSnapshot(me.level(), me.xpTotal()),
+                    PlayerProgressSnapshot.forBot(null)));
             commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
                     matchmakingId, null, gameId, true));
         } catch (Exception exception) {
