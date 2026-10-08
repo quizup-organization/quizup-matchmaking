@@ -1,3 +1,9 @@
+## [5.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v5.0.0...v5.1.0) (2026-10-08)
+
+### Features
+
+* **matchmaking:** snapshot de progression a la creation des parties ([83f0ecb](https://github.com/quizup-organization/quizup-matchmaking/commit/83f0ecb98649061e59e157b29c7570a81bc8c060))
+
 ## [5.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.5.1...v5.0.0) (2026-10-08)
 
 ### ⚠ BREAKING CHANGES
