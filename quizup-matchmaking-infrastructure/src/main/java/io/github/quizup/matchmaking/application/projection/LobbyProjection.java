@@ -10,8 +10,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Projection read-only du salon privé. La réussite purge la ligne immédiatement ; les états
- * terminaux (annulé/expiré/échoué) sont conservés le temps de la rétention avant purge.
+ * Projection read-only du salon privé. Tous les états terminaux (partie créée, annulé, refusé,
+ * expiré, échoué) sont conservés le temps de la rétention, puis supprimés sur
+ * {@code LobbyPurgedEvent}.
  */
 @Component
 @ProcessingGroup("lobby-projection")

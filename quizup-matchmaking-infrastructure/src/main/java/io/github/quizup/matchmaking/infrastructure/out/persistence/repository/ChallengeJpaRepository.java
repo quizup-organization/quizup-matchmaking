@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 
 @Repository
@@ -20,4 +21,12 @@ public interface ChallengeJpaRepository extends JpaRepository<ChallengeEntity, S
             """)
     List<ChallengeEntity> findPendingByPlayerId(@Param("status") ChallengeStatus status,
                                                 @Param("playerId") String playerId);
+
+    @Query("""
+            select c.challengeId from ChallengeEntity c
+            where c.status <> :pending
+              and c.resolvedAt < :before
+            """)
+    List<String> findTerminalIdsBefore(@Param("pending") ChallengeStatus pending,
+                                       @Param("before") Instant before);
 }

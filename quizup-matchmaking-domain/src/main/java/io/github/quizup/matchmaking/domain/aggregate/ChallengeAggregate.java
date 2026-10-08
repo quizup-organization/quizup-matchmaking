@@ -13,6 +13,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventsourcing.EventSourcingHandler;
 import org.axonframework.modelling.command.AggregateIdentifier;
+import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +29,8 @@ import static org.axonframework.modelling.command.AggregateLifecycle.apply;
  * <p>
  * Ne porte **ni présence ni temps réel** : l'acceptation crée une salle (saga) qui ouvre le
  * cycle de vie temps réel (présence, ready check, partie). Le défi se contente de la réponse
- * (accepté/refusé/annulé/expiré) et conserve le lien vers la salle.
+ * (accepté/refusé/annulé/expiré) ; le lien vers la salle est dérivé
+ * ({@code ChallengeRoomId}) et vit dans le read model, jamais dans l'agrégat.
  */
 @Aggregate
 public class ChallengeAggregate {
@@ -40,7 +42,6 @@ public class ChallengeAggregate {
     private String topicId;
     private String challengerId;
     private String opponentId;
-    private String roomId;
     private ChallengeStatus status;
 
     protected ChallengeAggregate() {
@@ -116,16 +117,11 @@ public class ChallengeAggregate {
         apply(new ChallengeEvent.ChallengeExpiredEvent(challengeId, Instant.now()));
     }
 
-    /** Commande interne (saga) : relie la salle créée à l'acceptation (idempotent). */
+    /** Commande interne (saga, après rétention) : purge l'état terminal, l'agrégat est supprimé. */
     @CommandHandler
-    public void handle(ChallengeCommand.LinkChallengeRoomCommand command) {
-        if (StringUtils.isNotBlank(roomId)) {
-            return;
-        }
-        if (status != ChallengeStatus.ACCEPTED) {
-            throw new ChallengeExceptions.ChallengeNotAcceptedProblem(challengeId, status.name());
-        }
-        apply(new ChallengeEvent.ChallengeRoomCreatedEvent(challengeId, command.roomId(), Instant.now()));
+    public void handle(ChallengeCommand.PurgeChallengeCommand command) {
+        logger.info("Purging challenge: challengeId={}", challengeId);
+        apply(new ChallengeEvent.ChallengePurgedEvent(challengeId, Instant.now()));
     }
 
     // ---------------------------------------------------------------------
@@ -194,7 +190,7 @@ public class ChallengeAggregate {
     }
 
     @EventSourcingHandler
-    public void on(ChallengeEvent.ChallengeRoomCreatedEvent event) {
-        this.roomId = event.roomId();
+    public void on(ChallengeEvent.ChallengePurgedEvent event) {
+        AggregateLifecycle.markDeleted();
     }
 }

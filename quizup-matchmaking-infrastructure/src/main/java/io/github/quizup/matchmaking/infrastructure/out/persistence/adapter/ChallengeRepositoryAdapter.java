@@ -8,6 +8,7 @@ import io.github.quizup.matchmaking.infrastructure.out.persistence.repository.Ch
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,5 +41,17 @@ public class ChallengeRepositoryAdapter implements ChallengeRepositoryPort {
                 .stream()
                 .map(ChallengeEntityMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> findTerminalIdsBefore(Instant before) {
+        return challengeJpaRepository.findTerminalIdsBefore(ChallengeStatus.PENDING, before);
+    }
+
+    @Override
+    @Transactional
+    public void deleteById(String challengeId) {
+        challengeJpaRepository.deleteById(challengeId);
     }
 }

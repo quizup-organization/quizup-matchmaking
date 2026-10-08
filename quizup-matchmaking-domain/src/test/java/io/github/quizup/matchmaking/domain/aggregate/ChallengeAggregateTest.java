@@ -112,27 +112,13 @@ class ChallengeAggregateTest {
     }
 
     @Test
-    void linkRoom_afterAccept_appliesRoomCreated() {
+    void purge_afterTerminal_appliesPurgedAndDeletesAggregate() {
         fixture.given(created(), accepted())
-                .when(new ChallengeCommand.LinkChallengeRoomCommand(CHALLENGE_ID, "room-1"))
+                .when(new ChallengeCommand.PurgeChallengeCommand(CHALLENGE_ID))
                 .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
-                        ChallengeEvent.ChallengeRoomCreatedEvent.class,
-                        e -> "room-1".equals(((ChallengeEvent.ChallengeRoomCreatedEvent) e).roomId())));
-    }
-
-    @Test
-    void linkRoom_isIdempotent() {
-        fixture.given(created(), accepted(), new ChallengeEvent.ChallengeRoomCreatedEvent(
-                        CHALLENGE_ID, "room-1", Instant.now()))
-                .when(new ChallengeCommand.LinkChallengeRoomCommand(CHALLENGE_ID, "room-2"))
-                .expectNoEvents();
-    }
-
-    @Test
-    void linkRoom_refusedWhenNotAccepted() {
-        fixture.given(created())
-                .when(new ChallengeCommand.LinkChallengeRoomCommand(CHALLENGE_ID, "room-1"))
-                .expectException(ChallengeExceptions.ChallengeNotAcceptedProblem.class);
+                        ChallengeEvent.ChallengePurgedEvent.class,
+                        e -> CHALLENGE_ID.equals(((ChallengeEvent.ChallengePurgedEvent) e).challengeId())))
+                .expectMarkedDeleted();
     }
 
     private static ChallengeEvent.ChallengeCreatedEvent created() {

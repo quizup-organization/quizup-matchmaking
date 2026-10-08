@@ -45,10 +45,9 @@ public interface ChallengeCommand {
     ) implements ChallengeCommand {
     }
 
-    /** Commande interne (saga) : relie la salle créée à l'acceptation (idempotent). */
-    record LinkChallengeRoomCommand(
-            @TargetAggregateIdentifier String challengeId,
-            String roomId
+    /** Commande interne (saga, après rétention) : purge un défi terminal. */
+    record PurgeChallengeCommand(
+            @TargetAggregateIdentifier String challengeId
     ) implements ChallengeCommand {
     }
 }

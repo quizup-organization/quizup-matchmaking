@@ -50,11 +50,25 @@ public interface ChallengeEvent {
     ) implements ChallengeEvent {
     }
 
-    /** La salle temps réel a été créée à l'acceptation (lien durable pour la reprise). */
+    /**
+     * Ancien lien salle porté par l'agrégat : conservé uniquement pour la désérialisation des
+     * streams historiques (event store / bus). Le {@code roomId} est désormais dérivé
+     * ({@code ChallengeRoomId}) et posé par la projection sur {@link ChallengeAcceptedEvent}.
+     *
+     * @deprecated n'est plus émis ; le roomId est déterministe.
+     */
+    @Deprecated(forRemoval = false)
     record ChallengeRoomCreatedEvent(
             String challengeId,
             String roomId,
             Instant roomCreatedAt
+    ) implements ChallengeEvent {
+    }
+
+    /** Purge après rétention : l'agrégat est supprimé et la projection supprime sa ligne. */
+    record ChallengePurgedEvent(
+            String challengeId,
+            Instant purgedAt
     ) implements ChallengeEvent {
     }
 }

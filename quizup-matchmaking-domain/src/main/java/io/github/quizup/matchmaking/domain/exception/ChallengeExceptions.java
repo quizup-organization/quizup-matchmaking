@@ -87,12 +87,4 @@ public final class ChallengeExceptions {
         }
     }
 
-    public static class ChallengeNotAcceptedProblem extends ChallengeProblem {
-        public ChallengeNotAcceptedProblem(String challengeId, String status) {
-            super(challengeId, "urn:quizup:challenge:notAccepted",
-                    "Défi non accepté",
-                    "Impossible de relier une salle à un défi en statut " + status,
-                    Map.of("status", status));
-        }
-    }
 }

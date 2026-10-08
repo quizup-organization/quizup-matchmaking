@@ -16,7 +16,9 @@ Deux responsabilités **distinctes**, chacune avec son agrégat :
   (même thème, niveau ±5, langues **en union** couvertes par le thème) ; à l'échéance de **5 s**
   sans adversaire, crée une **partie bot**. Le bot n'est jamais un participant du salon.
 - **Défi nominatif** (`ChallengeAggregate`) : intention **asynchrone** « A défie B » (TTL 1 h,
-  accept/refuse/annule/expire), sans présence ni partie. À l'acceptation, une saga crée la salle.
+  accept/refuse/annule/expire), sans présence ni partie. À l'acceptation, une saga crée la salle ;
+  le lien vers la salle est **dérivé** (`ChallengeRoomId`, déterministe) et vit dans le read model,
+  jamais dans l'agrégat. Un état terminal est purgé après rétention (2 min).
 - **Salle temps réel** (`LobbyAggregate`) : présence des deux humains (lien partageable
   `/join/{lobbyId}` ou salle issue d'un défi). Chacun **entre** (`EnterLobbyRoom`) ; quand les deux
   sont présents, un **compte à rebours de 3 s** précède la création de la partie. Un salon non
@@ -25,16 +27,19 @@ Deux responsabilités **distinctes**, chacune avec son agrégat :
 
 ### Cycle de vie (statuts réduits)
 
-Les deux agrégats sont **éphémères** : statuts réduits au cycle de vie et suppression différée.
+Les trois agrégats sont **éphémères** : statuts réduits au cycle de vie et suppression différée
+(le défi conserve ses statuts de réponse, sans `CLOSED`/`FAILED`).
 
-- `MatchmakingStatus = SEARCHING | CLOSED | FAILED` ; `LobbyStatus = CREATED | CLOSED | FAILED`.
+- `MatchmakingStatus = SEARCHING | CLOSED | FAILED` ; `LobbyStatus = CREATED | CLOSED | FAILED` ;
+  `ChallengeStatus = PENDING | ACCEPTED | DECLINED | CANCELLED | EXPIRED`.
 - `CLOSED` = fin normale (partie créée, annulée, refusée, expirée) ; `FAILED` = échec système
   (création de partie impossible). L'issue exacte est portée par l'événement terminal et la
   notification.
 - **Aucune suppression immédiate** : l'agrégat reste joignable pendant la **rétention**
-  (`LOBBY_PURGE` / `MATCHMAKING_PURGE`, 2 min) puis la saga envoie la commande de purge ;
-  `markDeleted()` est appelé dans l'`@EventSourcingHandler` du `*PurgedEvent` (standard Axon).
-  L'event store conserve l'historique (`GET .../notifications` reste lisible après purge).
+  (`LOBBY_PURGE` / `MATCHMAKING_PURGE` / `CHALLENGE_PURGE`, 2 min) puis la saga envoie la commande
+  de purge ; `markDeleted()` est appelé dans l'`@EventSourcingHandler` du `*PurgedEvent` (standard
+  Axon) et la projection supprime sa ligne. L'event store conserve l'historique
+  (`GET .../notifications` reste lisible après purge).
 
 **Package** : `io.github.quizup.matchmaking`
 
@@ -61,14 +66,28 @@ exposée par le service.
 | Port out                          | Service cible     | Query Axon envoyée (QueryGateway)          |
 |-----------------------------------|-------------------|--------------------------------------------|
 | `ProfileRepositoryPort`           | `quizup-profile`  | `ProfileQuery.GetProfileQuery`              |
-| `MatchmakingPlayerPort` (présence)| `quizup-profile`  | `PresenceQuery.GetPresencesByIdsQuery`      |
+| `MatchmakingPlayerPort`           | `quizup-profile`  | `ProfileQuery.GetProfileQuery` + `ProgressionQuery.GetProgressionQuery` |
 | `TopicAvailabilityPort`           | `quizup-theme`    | `QuestionQuery.CountApprovedQuestionsByTopicAndLanguagesQuery` |
 
 Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau + pays),
 `TopicAvailabilityService` (couverture des langues), `PlayerService`.
 
 **Ports sortants locaux** : `MatchmakingPoolPort`, `MatchmakingRepositoryPort`,
-`MatchmakingEventStorePort`, `LobbyRepositoryPort`, `LobbyEventStorePort`.
+`MatchmakingEventStorePort`, `LobbyRepositoryPort`, `LobbyEventStorePort`,
+`ChallengeRepositoryPort`.
+
+### Défi nominatif (`ChallengeSaga` + `RoomSaga`)
+
+- `ChallengeSaga` : `ChallengeCreatedEvent` → expiration **1 h** ; chaque terminal
+  (`Accepted`, `Declined`, `Cancelled`, `Expired`) → purge planifiée (rétention **2 min**,
+  `CHALLENGE_PURGE`) ; `ChallengePurgedEvent` termine la saga (`markDeleted`).
+- `RoomSaga` : `ChallengeAcceptedEvent` → **one-shot** (saga créée et terminée dans le même
+  handler) : `CreateLobbyCommand` (roomId déterministe `ChallengeRoomId`) + `JoinLobbyCommand`.
+  Aucun lien salle n'est écrit dans l'agrégat : la projection du défi dérive le `roomId` sur
+  l'acceptation.
+- `ChallengePurgeSweeper` : balayeur périodique (60 s) qui envoie une commande de purge
+  idempotente pour les défis terminaux plus vieux que rétention + marge (10 min) — filet pour
+  l'historique antérieur à la saga de purge ou les deadlines perdues.
 
 ### Appariement public (`MatchmakingSaga`)
 

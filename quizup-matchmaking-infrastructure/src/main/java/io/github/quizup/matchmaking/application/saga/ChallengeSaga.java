@@ -18,10 +18,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * Orchestration du défi nominatif (intention asynchrone) : expiration après 1 h sans réponse.
+ * Orchestration du défi nominatif (intention asynchrone) : expiration après 1 h sans réponse,
+ * puis purge de la réponse après rétention (2 min).
  * <p>
- * L'acceptation crée la <b>salle temps réel</b> : cette responsabilité sera portée par la saga
- * de la salle (écoutant {@code ChallengeAcceptedEvent}) afin de garder chaque cycle de vie isolé.
+ * L'acceptation crée la <b>salle temps réel</b> : cette responsabilité est portée par
+ * {@code RoomSaga} (écoutant {@code ChallengeAcceptedEvent}) afin de garder chaque cycle de vie
+ * isolé. Cette saga reste vivante jusqu'à la purge pour expirer ou supprimer le défi.
  */
 @Saga
 @ProcessingGroup("challenge-saga")
@@ -43,6 +45,10 @@ public class ChallengeSaga {
     @Setter
     private String expiryDeadlineId;
 
+    @Getter
+    @Setter
+    private String purgeDeadlineId;
+
     @StartSaga
     @SagaEventHandler(associationProperty = "challengeId")
     public void on(ChallengeEvent.ChallengeCreatedEvent event) {
@@ -60,29 +66,57 @@ public class ChallengeSaga {
         commandGateway.send(new ChallengeCommand.ExpireChallengeCommand(challengeId));
     }
 
-    @EndSaga
     @SagaEventHandler(associationProperty = "challengeId")
     public void on(ChallengeEvent.ChallengeAcceptedEvent event) {
         cancelExpiry();
+        schedulePurge();
         logger.info("Défi accepté: challengeId={}", challengeId);
     }
 
-    @EndSaga
     @SagaEventHandler(associationProperty = "challengeId")
     public void on(ChallengeEvent.ChallengeDeclinedEvent event) {
         cancelExpiry();
+        schedulePurge();
     }
 
-    @EndSaga
     @SagaEventHandler(associationProperty = "challengeId")
     public void on(ChallengeEvent.ChallengeCancelledEvent event) {
         cancelExpiry();
+        schedulePurge();
+    }
+
+    @SagaEventHandler(associationProperty = "challengeId")
+    public void on(ChallengeEvent.ChallengeExpiredEvent event) {
+        cancelExpiry();
+        schedulePurge();
+    }
+
+    @DeadlineHandler(deadlineName = ChallengeDeadline.CHALLENGE_PURGE)
+    public void onPurge() {
+        commandGateway.send(new ChallengeCommand.PurgeChallengeCommand(challengeId));
     }
 
     @EndSaga
     @SagaEventHandler(associationProperty = "challengeId")
-    public void on(ChallengeEvent.ChallengeExpiredEvent event) {
+    public void on(ChallengeEvent.ChallengePurgedEvent event) {
+        cancelAllDeadlines();
+        logger.info("Saga défi terminée (purgé): challengeId={}", challengeId);
+    }
+
+    private void schedulePurge() {
+        if (purgeDeadlineId == null) {
+            purgeDeadlineId = deadlineManager.schedule(
+                    ChallengeDeadline.CHALLENGE_RETENTION_DURATION,
+                    ChallengeDeadline.CHALLENGE_PURGE);
+        }
+    }
+
+    private void cancelAllDeadlines() {
         cancelExpiry();
+        if (purgeDeadlineId != null) {
+            deadlineManager.cancelSchedule(ChallengeDeadline.CHALLENGE_PURGE, purgeDeadlineId);
+            purgeDeadlineId = null;
+        }
     }
 
     private void cancelExpiry() {

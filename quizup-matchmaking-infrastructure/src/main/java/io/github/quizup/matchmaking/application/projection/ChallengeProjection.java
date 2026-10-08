@@ -2,6 +2,7 @@ package io.github.quizup.matchmaking.application.projection;
 
 import io.github.quizup.matchmaking.domain.event.ChallengeEvent;
 import io.github.quizup.matchmaking.domain.model.Challenge;
+import io.github.quizup.matchmaking.domain.model.ChallengeRoomId;
 import io.github.quizup.matchmaking.domain.model.ChallengeStatus;
 import io.github.quizup.matchmaking.domain.port.out.ChallengeRepositoryPort;
 import org.axonframework.config.ProcessingGroup;
@@ -44,6 +45,7 @@ public class ChallengeProjection {
         update(event.challengeId(), challenge -> challenge.toBuilder()
                 .status(ChallengeStatus.ACCEPTED)
                 .resolvedAt(event.acceptedAt())
+                .roomId(ChallengeRoomId.of(event.challengeId()))
                 .build());
     }
 
@@ -76,10 +78,8 @@ public class ChallengeProjection {
 
     @EventHandler
     @Transactional
-    public void on(ChallengeEvent.ChallengeRoomCreatedEvent event) {
-        update(event.challengeId(), challenge -> challenge.toBuilder()
-                .roomId(event.roomId())
-                .build());
+    public void on(ChallengeEvent.ChallengePurgedEvent event) {
+        challengeRepositoryPort.deleteById(event.challengeId());
     }
 
     private void update(String challengeId, UnaryOperator<Challenge> transform) {

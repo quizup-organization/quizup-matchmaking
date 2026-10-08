@@ -2,6 +2,7 @@ package io.github.quizup.matchmaking.application.projection;
 
 import io.github.quizup.matchmaking.domain.event.ChallengeEvent;
 import io.github.quizup.matchmaking.domain.model.Challenge;
+import io.github.quizup.matchmaking.domain.model.ChallengeRoomId;
 import io.github.quizup.matchmaking.domain.model.ChallengeStatus;
 import io.github.quizup.matchmaking.domain.port.out.ChallengeRepositoryPort;
 import org.junit.jupiter.api.Test;
@@ -33,10 +34,11 @@ class ChallengeProjectionTest {
         assertThat(saved.status()).isEqualTo(ChallengeStatus.PENDING);
         assertThat(saved.opponentId()).isEqualTo("opponent-1");
         assertThat(saved.resolvedAt()).isNull();
+        assertThat(saved.roomId()).isNull();
     }
 
     @Test
-    void accepted_marksResolvedAndKeepsRoomLink() {
+    void accepted_marksResolvedAndDerivesRoomLink() {
         when(repository.findById("challenge-1")).thenReturn(Optional.of(challenge()));
 
         projection.on(new ChallengeEvent.ChallengeAcceptedEvent(
@@ -46,17 +48,14 @@ class ChallengeProjectionTest {
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().status()).isEqualTo(ChallengeStatus.ACCEPTED);
         assertThat(captor.getValue().resolvedAt()).isEqualTo(AT);
+        assertThat(captor.getValue().roomId()).isEqualTo(ChallengeRoomId.of("challenge-1"));
     }
 
     @Test
-    void roomCreated_linksRoom() {
-        when(repository.findById("challenge-1")).thenReturn(Optional.of(challenge()));
+    void purged_deletesChallenge() {
+        projection.on(new ChallengeEvent.ChallengePurgedEvent("challenge-1", AT));
 
-        projection.on(new ChallengeEvent.ChallengeRoomCreatedEvent("challenge-1", "room-1", AT));
-
-        ArgumentCaptor<Challenge> captor = ArgumentCaptor.forClass(Challenge.class);
-        verify(repository).save(captor.capture());
-        assertThat(captor.getValue().roomId()).isEqualTo("room-1");
+        verify(repository).deleteById("challenge-1");
     }
 
     private static Challenge challenge() {
