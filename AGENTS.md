@@ -4,7 +4,7 @@
 > d'attente). Architecture : Axon Framework (CQRS/EDA) + JPA (projections). Sagas et deadlines
 > pour l'appariement et l'expiration.
 > Pour les règles de patterns : [
-`../../best-practices/.backend/hexagonal-architecture.md`](../../best-practices/.backend/hexagonal-architecture.md).
+`../../best-practices/.backend/folder-structure.md`](../../best-practices/.backend/folder-structure.md).
 
 ---
 
