@@ -1,3 +1,14 @@
+## [5.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.5.1...v5.0.0) (2026-10-08)
+
+### ⚠ BREAKING CHANGES
+
+* **matchmaking:** LinkChallengeRoomCommand et ChallengeNotAcceptedProblem
+sont supprimes du contrat quizup-matchmaking-domain.
+
+### Features
+
+* **matchmaking:** purge des defis et roomId derive hors de l'agregat ([d570d54](https://github.com/quizup-organization/quizup-matchmaking/commit/d570d54873d1f915680977c92e8fb8f527197116))
+
 ## [4.5.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v4.5.0...v4.5.1) (2026-10-07)
 
 ### Bug Fixes
