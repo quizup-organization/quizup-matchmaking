@@ -23,7 +23,8 @@ Deux responsabilités **distinctes**, chacune avec son agrégat :
   `/join/{lobbyId}` ou salle issue d'un défi). Chacun **entre** (`EnterLobbyRoom`) ; quand les deux
   sont présents, un **compte à rebours de 3 s** précède la création de la partie. Un salon non
   lancé expire après **1 jour** ; une **sortie explicite est non destructive** (retour possible) et
-  seul un joueur **hors ligne** ferme ses salles ouvertes (`RoomPresenceHandler`).
+  la **présence n'entre pas en jeu** : jamais de fermeture sur passage hors ligne (un lien partagé
+  survit donc aux verrouillages d'écran, micro-coupures réseau ou redéploiements du BFF).
 
 ### Cycle de vie (statuts réduits)
 
@@ -113,7 +114,8 @@ Implémentation : `application/service/MatchmakingPlayerService` (nom + niveau +
 - Fin du compte à rebours → `CreateGameCommand(HUMAN/HUMAN)` **attendu** (`sendAndWait`, pour
   compenser un échec asynchrone) puis `CompleteLobbyCommand` ; échec → `FailLobbyCommand`.
 - Expiration → `ExpireLobbyCommand` (`EXPIRED`).
-- `PlayerWentOfflineEvent` (profile) → `RoomPresenceHandler` ferme les salles ouvertes du joueur.
+- **Pas de fermeture sur présence** : `PlayerWentOfflineEvent` n'est pas consommé par ce service ;
+  un salon ouvert ne se ferme que par expiration ou annulation/refus explicite.
 - `LobbyCancelled|Declined|Expired|Completed|Failed` → `CLOSED`/`FAILED` + purge planifiée
   (rétention 2 min) ; `LobbyPurgedEvent` termine la saga (`markDeleted`).
 - **`MatchmakingPoolPort`** : le claim n'écrit plus de statut (uniquement `claimed_by`), le statut

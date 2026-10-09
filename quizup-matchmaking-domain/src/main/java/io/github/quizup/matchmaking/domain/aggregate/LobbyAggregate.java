@@ -163,8 +163,8 @@ public class LobbyAggregate {
 
     /**
      * Sortie **non destructive** : le joueur quitte la salle mais le salon reste ouvert (il peut
-     * y revenir via son lien ou l'inbox). Seule {@code CancelLobbyCommand} (initiateur) ferme
-     * le salon ; un joueur hors ligne reste fermé par {@code RoomPresenceHandler}.
+     * y revenir via son lien ou l'inbox). Le salon ne se ferme que par {@code CancelLobbyCommand}
+     * (initiateur), annulation/refus, ou expiration — jamais sur passage hors ligne.
      */
     @CommandHandler
     public void handle(LobbyCommand.LeaveLobbyCommand command) {
