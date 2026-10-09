@@ -1,3 +1,9 @@
+## [5.1.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v5.1.0...v5.1.1) (2026-10-09)
+
+### Bug Fixes
+
+* **matchmaking:** ne plus fermer les salons sur passage hors ligne ([fc5cdd7](https://github.com/quizup-organization/quizup-matchmaking/commit/fc5cdd77d229f195254dc53e62ab5d26442db65f))
+
 ## [5.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v5.0.0...v5.1.0) (2026-10-08)
 
 ### Features
