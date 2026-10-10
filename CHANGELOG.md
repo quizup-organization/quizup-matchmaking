@@ -1,3 +1,14 @@
+## [6.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v5.1.1...v6.0.0) (2026-10-10)
+
+### ⚠ BREAKING CHANGES
+
+* **matchmaking:** contrat public Room (événements/commandes/queries/migrations)
+et CreateGameCommand consommé.
+
+### Features
+
+* **matchmaking:** Room remplace Lobby, sagas de défi unifiées, apparition client-driven ([f046209](https://github.com/quizup-organization/quizup-matchmaking/commit/f0462096bdf550a8b753503c1ce22301936e5b35))
+
 ## [5.1.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v5.1.0...v5.1.1) (2026-10-09)
 
 ### Bug Fixes
