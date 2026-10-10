@@ -7,14 +7,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Classe de base pour toutes les exceptions métier liées au domaine Lobby/Matchmaking
+ * Classe de base des problèmes métier liés à la salle.
  */
-public abstract class LobbyProblem extends BaseProblem {
+public abstract class RoomProblem extends BaseProblem {
 
-    private final String lobbyId;
+    private final String roomId;
 
-    protected LobbyProblem(
-            String lobbyId,
+    protected RoomProblem(
+            String roomId,
             String type,
             ProblemCategory category,
             String title,
@@ -25,39 +25,38 @@ public abstract class LobbyProblem extends BaseProblem {
                 category,
                 title,
                 detail,
-                mergeContext(context, lobbyId)
+                mergeContext(context, roomId)
         );
-        this.lobbyId = lobbyId;
+        this.roomId = roomId;
     }
 
-    protected LobbyProblem(
-            String lobbyId,
+    protected RoomProblem(
+            String roomId,
             String type,
             String title,
             String detail,
             Map<String, Object> context) {
-        this(lobbyId, type, ProblemCategory.BUSINESS_INVALID_COMMAND, title, detail, context);
+        this(roomId, type, ProblemCategory.BUSINESS_INVALID_COMMAND, title, detail, context);
     }
 
-    protected LobbyProblem(
-            String lobbyId,
+    protected RoomProblem(
+            String roomId,
             String type,
             String title,
             String detail) {
-        this(lobbyId, type, ProblemCategory.BUSINESS_INVALID_COMMAND, title, detail, null);
+        this(roomId, type, ProblemCategory.BUSINESS_INVALID_COMMAND, title, detail, null);
     }
 
-    private static Map<String, Object> mergeContext(Map<String, Object> context, String lobbyId) {
+    private static Map<String, Object> mergeContext(Map<String, Object> context, String roomId) {
         Map<String, Object> merged = new HashMap<>();
         if (context != null) {
             merged.putAll(context);
         }
-        merged.put("lobbyId", lobbyId);
+        merged.put("roomId", roomId);
         return merged;
     }
 
-    public String getLobbyId() {
-        return lobbyId;
+    public String getRoomId() {
+        return roomId;
     }
 }
-

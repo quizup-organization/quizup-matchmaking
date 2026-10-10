@@ -1,6 +1,6 @@
 package io.github.quizup.matchmaking.infrastructure.out.persistence.entity;
 
-import io.github.quizup.matchmaking.domain.model.LobbyStatus;
+import io.github.quizup.matchmaking.domain.model.RoomStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -8,21 +8,23 @@ import lombok.Setter;
 import java.time.Instant;
 
 /**
- * Projection du salon privé (salle d'attente). La réussite purge la ligne (aucun statut persistant).
+ * Projection de la salle (salle d'attente temps réel). Les états terminaux sont conservés le
+ * temps de la rétention puis purgés par la saga.
  */
 @Setter
 @Getter
 @Entity
-@Table(name = "lobby_entry", indexes = {
-        @Index(name = "idx_lobby_initiator", columnList = "initiator_id"),
-        @Index(name = "idx_lobby_opponent", columnList = "opponent_id"),
-        @Index(name = "idx_lobby_status", columnList = "status")
+@Table(name = "room_entry", indexes = {
+        @Index(name = "idx_room_initiator", columnList = "initiator_id"),
+        @Index(name = "idx_room_opponent", columnList = "opponent_id"),
+        @Index(name = "idx_room_participant", columnList = "participant_id"),
+        @Index(name = "idx_room_status", columnList = "status")
 })
-public class LobbyEntity {
+public class RoomEntity {
 
     @Id
-    @Column(name = "lobby_id", nullable = false)
-    private String lobbyId;
+    @Column(name = "room_id", nullable = false)
+    private String roomId;
 
     @Column(name = "topic_id", nullable = false)
     private String topicId;
@@ -41,7 +43,7 @@ public class LobbyEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private LobbyStatus status;
+    private RoomStatus status;
 
     @Column(name = "initiator_present", nullable = false)
     private boolean initiatorPresent;
@@ -54,9 +56,6 @@ public class LobbyEntity {
 
     @Column(name = "ready_deadline_at")
     private Instant readyDeadlineAt;
-
-    @Column(name = "missed_reason", length = 64)
-    private String missedReason;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

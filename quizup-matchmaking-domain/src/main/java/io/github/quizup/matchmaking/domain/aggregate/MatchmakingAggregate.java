@@ -2,7 +2,7 @@ package io.github.quizup.matchmaking.domain.aggregate;
 
 import io.github.quizup.matchmaking.domain.command.MatchmakingCommand;
 import io.github.quizup.matchmaking.domain.event.MatchmakingEvent;
-import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
+import io.github.quizup.matchmaking.domain.exception.MatchmakingExceptions;
 import io.github.quizup.matchmaking.domain.model.MatchmakingStatus;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import org.apache.commons.lang3.StringUtils;
@@ -47,12 +47,8 @@ public class MatchmakingAggregate {
 
     @CommandHandler
     public MatchmakingAggregate(MatchmakingCommand.CreateMatchmakingCommand command) {
-        if (StringUtils.isBlank(command.playerId())) {
-            throw new LobbyExceptions.MissingPlayerIdentifierProblem(command.matchmakingId());
-        }
-        if (StringUtils.isBlank(command.topicId())) {
-            throw new LobbyExceptions.MissingTopicIdentifierProblem(command.matchmakingId());
-        }
+        requirePlayerId(command.playerId(), command.matchmakingId());
+        requireTopicId(command.topicId(), command.matchmakingId());
         logger.info("Starting matchmaking: matchmakingId={}, playerId={}, topicId={}, level={}",
                 command.matchmakingId(), command.playerId(), command.topicId(), command.level());
         apply(new MatchmakingEvent.MatchmakingStartedEvent(
@@ -70,7 +66,7 @@ public class MatchmakingAggregate {
             return;
         }
         if (!command.playerId().equals(playerId)) {
-            throw new LobbyExceptions.PlayerNotInLobbyProblem(matchmakingId, command.playerId());
+            throw new MatchmakingExceptions.PlayerNotInMatchmakingProblem(matchmakingId, command.playerId());
         }
         apply(new MatchmakingEvent.MatchmakingCancelledEvent(matchmakingId, "PLAYER_CANCELLED", Instant.now()));
     }
@@ -81,10 +77,10 @@ public class MatchmakingAggregate {
             if (command.gameId().equals(gameId)) {
                 return;
             }
-            throw new LobbyExceptions.MatchmakingNotSearchingProblem(matchmakingId, status.name());
+            throw new MatchmakingExceptions.MatchmakingNotSearchingProblem(matchmakingId, status.name());
         }
         if (status != MatchmakingStatus.SEARCHING) {
-            throw new LobbyExceptions.MatchmakingNotSearchingProblem(matchmakingId, status.name());
+            throw new MatchmakingExceptions.MatchmakingNotSearchingProblem(matchmakingId, status.name());
         }
         logger.info("Matching: matchmakingId={}, opponentId={}, gameId={}, vsBot={}",
                 matchmakingId, command.opponentId(), command.gameId(), command.vsBot());
@@ -113,6 +109,20 @@ public class MatchmakingAggregate {
     }
 
     // ============================ Event Sourcing ============================
+
+    // ── Validateurs (requireXxx : nommés, appelés en tête de handler) ──
+
+    private static void requirePlayerId(String playerId, String matchmakingId) {
+        if (StringUtils.isBlank(playerId)) {
+            throw new MatchmakingExceptions.MissingPlayerIdentifierProblem(matchmakingId);
+        }
+    }
+
+    private static void requireTopicId(String topicId, String matchmakingId) {
+        if (StringUtils.isBlank(topicId)) {
+            throw new MatchmakingExceptions.MissingTopicIdentifierProblem(matchmakingId);
+        }
+    }
 
     @EventSourcingHandler
     public void on(MatchmakingEvent.MatchmakingStartedEvent event) {

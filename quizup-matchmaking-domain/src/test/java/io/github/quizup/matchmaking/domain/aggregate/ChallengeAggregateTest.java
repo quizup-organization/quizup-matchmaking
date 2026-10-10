@@ -4,8 +4,6 @@ import io.github.quizup.axon.test.QuizUpAxonMatchers;
 import io.github.quizup.matchmaking.domain.command.ChallengeCommand;
 import io.github.quizup.matchmaking.domain.event.ChallengeEvent;
 import io.github.quizup.matchmaking.domain.exception.ChallengeExceptions;
-import io.github.quizup.matchmaking.domain.port.out.ProfileRepositoryPort;
-import io.github.quizup.matchmaking.domain.port.out.TopicAvailabilityPort;
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +11,7 @@ import java.time.Instant;
 
 /**
  * Test Axon in-memory de {@link ChallengeAggregate} : intention asynchrone A → B,
- * sans présence ni création de partie.
+ * sans présence, sans création de partie et sans validation de faisabilité (la salle prépare).
  */
 class ChallengeAggregateTest {
 
@@ -25,11 +23,6 @@ class ChallengeAggregateTest {
 
     private final AggregateTestFixture<ChallengeAggregate> fixture =
             new AggregateTestFixture<>(ChallengeAggregate.class);
-
-    ChallengeAggregateTest() {
-        fixture.registerInjectableResource((ProfileRepositoryPort) id -> null);
-        fixture.registerInjectableResource((TopicAvailabilityPort) (topicId, languages) -> true);
-    }
 
     @Test
     void create_appliesCreatedEvent() {

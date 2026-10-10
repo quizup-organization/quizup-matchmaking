@@ -1,8 +1,10 @@
 package io.github.quizup.matchmaking.application.saga;
 
 import io.github.quizup.matchmaking.domain.command.ChallengeCommand;
+import io.github.quizup.matchmaking.domain.command.RoomCommand;
 import io.github.quizup.matchmaking.domain.event.ChallengeEvent;
 import io.github.quizup.matchmaking.domain.model.ChallengeDeadline;
+import io.github.quizup.matchmaking.domain.model.ChallengeRoomId;
 import lombok.Getter;
 import lombok.Setter;
 import org.axonframework.commandhandling.gateway.CommandGateway;
@@ -18,12 +20,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * Orchestration du défi nominatif (intention asynchrone) : expiration après 1 h sans réponse,
- * puis purge de la réponse après rétention (2 min).
- * <p>
- * L'acceptation crée la <b>salle temps réel</b> : cette responsabilité est portée par
- * {@code RoomSaga} (écoutant {@code ChallengeAcceptedEvent}) afin de garder chaque cycle de vie
- * isolé. Cette saga reste vivante jusqu'à la purge pour expirer ou supprimer le défi.
+ * Orchestration du défi nominatif : expiration après 1 h sans réponse, purge après rétention
+ * (2 min) et, à l'acceptation, <b>création de la salle</b> (identifiant déterministe
+ * {@link ChallengeRoomId}). La saga ne joint personne et ne touche jamais à la présence :
+ * le client seul fait apparaître le joueur dans la salle ({@code JoinRoomCommand}).
  */
 @Saga
 @ProcessingGroup("challenge-saga")
@@ -49,6 +49,10 @@ public class ChallengeSaga {
     @Setter
     private String purgeDeadlineId;
 
+    @Getter
+    @Setter
+    private boolean roomRequested;
+
     @StartSaga
     @SagaEventHandler(associationProperty = "challengeId")
     public void on(ChallengeEvent.ChallengeCreatedEvent event) {
@@ -70,7 +74,13 @@ public class ChallengeSaga {
     public void on(ChallengeEvent.ChallengeAcceptedEvent event) {
         cancelExpiry();
         schedulePurge();
-        logger.info("Défi accepté: challengeId={}", challengeId);
+        if (!roomRequested) {
+            roomRequested = true;
+            String roomId = ChallengeRoomId.of(event.challengeId());
+            logger.info("Défi accepté → création de la salle: challengeId={}, roomId={}", challengeId, roomId);
+            commandGateway.send(new RoomCommand.CreateRoomCommand(
+                    roomId, event.topicId(), event.challengerId(), event.opponentId()));
+        }
     }
 
     @SagaEventHandler(associationProperty = "challengeId")

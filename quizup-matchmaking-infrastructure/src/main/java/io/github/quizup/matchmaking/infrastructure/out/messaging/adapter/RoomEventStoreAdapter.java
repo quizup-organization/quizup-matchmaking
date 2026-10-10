@@ -1,7 +1,7 @@
 package io.github.quizup.matchmaking.infrastructure.out.messaging.adapter;
 
-import io.github.quizup.matchmaking.domain.event.LobbyEvent;
-import io.github.quizup.matchmaking.domain.port.out.LobbyEventStorePort;
+import io.github.quizup.matchmaking.domain.event.RoomEvent;
+import io.github.quizup.matchmaking.domain.port.out.RoomEventStorePort;
 import io.github.quizup.microservice.core.domain.model.notification.EventEnvelope;
 import org.axonframework.eventhandling.DomainEventMessage;
 import org.axonframework.eventsourcing.eventstore.DomainEventStream;
@@ -12,26 +12,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
-public class LobbyEventStoreAdapter implements LobbyEventStorePort {
+public class RoomEventStoreAdapter implements RoomEventStorePort {
 
     private final EventStore eventStore;
 
-    public LobbyEventStoreAdapter(EventStore eventStore) {
+    public RoomEventStoreAdapter(EventStore eventStore) {
         this.eventStore = eventStore;
     }
 
     @Override
-    public List<EventEnvelope> findEventEnvelopesByLobbyId(String lobbyId) {
+    public List<EventEnvelope> findEventEnvelopesByRoomId(String roomId) {
         List<EventEnvelope> envelopes = new ArrayList<>();
-        DomainEventStream eventStream = eventStore.readEvents(lobbyId);
+        DomainEventStream eventStream = eventStore.readEvents(roomId);
         while (eventStream.hasNext()) {
             DomainEventMessage<?> message = eventStream.next();
-            if (message.getPayload() instanceof LobbyEvent lobbyEvent) {
+            if (message.getPayload() instanceof RoomEvent roomEvent) {
                 envelopes.add(EventEnvelope.of(
                         message.getAggregateIdentifier(),
                         message.getSequenceNumber(),
                         message.getTimestamp(),
-                        lobbyEvent
+                        roomEvent
                 ));
             }
         }

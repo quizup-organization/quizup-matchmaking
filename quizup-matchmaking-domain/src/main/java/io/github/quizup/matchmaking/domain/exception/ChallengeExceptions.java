@@ -1,10 +1,8 @@
 package io.github.quizup.matchmaking.domain.exception;
 
 import io.github.quizup.microservice.core.domain.exception.ProblemCategory;
-import io.github.quizup.microservice.core.domain.model.i18n.Language;
 
 import java.util.Map;
-import java.util.Set;
 
 public final class ChallengeExceptions {
 
@@ -73,17 +71,6 @@ public final class ChallengeExceptions {
         public MissingTopicIdentifierProblem(String challengeId) {
             super(challengeId, "urn:quizup:challenge:missingTopicId",
                     "Identifiant topic manquant", "Un identifiant topic valide est requis");
-        }
-    }
-
-    public static class TopicNotAvailableInLanguageProblem extends ChallengeProblem {
-        public TopicNotAvailableInLanguageProblem(String challengeId, String topicId, Set<Language> languages) {
-            super(challengeId, "urn:quizup:challenge:topicNotAvailableInLanguage",
-                    ProblemCategory.BUSINESS_INVALID_COMMAND,
-                    "Thème non disponible dans cette langue",
-                    "Le thème " + topicId + " n'a pas assez de questions dans " + languages,
-                    Map.of("topicId", topicId,
-                            "languages", languages.stream().map(Language::code).toList()));
         }
     }
 

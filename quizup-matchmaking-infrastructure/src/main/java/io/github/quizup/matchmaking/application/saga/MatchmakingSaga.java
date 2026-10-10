@@ -2,11 +2,14 @@ package io.github.quizup.matchmaking.application.saga;
 
 import io.github.quizup.game.domain.command.GameCommand;
 import io.github.quizup.game.domain.model.GamePlayerType;
+import io.github.quizup.game.domain.model.GameQuestion;
+import io.github.quizup.game.domain.model.GameRules;
 import io.github.quizup.game.domain.model.PlayerProgressSnapshot;
+import io.github.quizup.matchmaking.application.service.QuestionDrawService;
 import io.github.quizup.matchmaking.domain.command.MatchmakingCommand;
 import io.github.quizup.matchmaking.domain.event.MatchmakingEvent;
-import io.github.quizup.matchmaking.domain.model.LobbyDeadline;
 import io.github.quizup.matchmaking.domain.model.MatchmakingCandidate;
+import io.github.quizup.matchmaking.domain.model.MatchmakingDeadline;
 import io.github.quizup.matchmaking.domain.model.MatchmakingRules;
 import io.github.quizup.matchmaking.domain.model.PlayerSummary;
 import io.github.quizup.matchmaking.domain.port.out.MatchmakingPlayerPort;
@@ -39,8 +42,8 @@ import java.util.UUID;
  * <p>
  * Le dernier arrivé initie le pairage : il cherche un candidat plus ancien, compatible
  * (même sujet, niveau ±{@code LEVEL_WINDOW}, langues couvertes par le sujet), le réclame
- * atomiquement, crée la partie puis marque les deux recherches comme appariées.
- * À l'échéance (5 s) sans adversaire, il crée une partie bot.
+ * atomiquement, <b>prépare les questions</b> puis crée la partie et marque les deux recherches
+ * comme appariées. À l'échéance (5 s) sans adversaire, il crée une partie bot.
  */
 @Saga
 @ProcessingGroup("matchmaking-saga")
@@ -63,6 +66,9 @@ public class MatchmakingSaga {
 
     @Autowired
     private transient TopicAvailabilityPort topicAvailabilityPort;
+
+    @Autowired
+    private transient QuestionDrawService questionDrawService;
 
     @Getter
     @Setter
@@ -111,8 +117,8 @@ public class MatchmakingSaga {
         this.languages = event.languages();
 
         this.deadlineId = deadlineManager.schedule(
-                LobbyDeadline.MATCHMAKING_DEADLINE_DURATION,
-                LobbyDeadline.MATCHMAKING_DEADLINE);
+                MatchmakingDeadline.MATCHMAKING_DEADLINE_DURATION,
+                MatchmakingDeadline.MATCHMAKING_DEADLINE);
 
         tryMatch(event.languages());
     }
@@ -133,12 +139,23 @@ public class MatchmakingSaga {
             if (pool.claim(candidate.matchmakingId(), playerId).isEmpty()) {
                 continue; // course : candidat déjà pris
             }
-            createHumanGame(candidate, union);
+            List<GameQuestion> questions = questionDrawService.draw(topicId, union);
+            if (questions.size() < GameRules.TOTAL_ROUNDS) {
+                logger.warn("Questions insuffisantes pour l'appariement {} / {} (topic={}, questions={})",
+                        matchmakingId, candidate.matchmakingId(), topicId, questions.size());
+                commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(
+                        matchmakingId, "TOPIC_NOT_AVAILABLE_IN_LANGUAGE"));
+                commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(
+                        candidate.matchmakingId(), "TOPIC_NOT_AVAILABLE_IN_LANGUAGE"));
+                this.finished = true;
+                return;
+            }
+            createHumanGame(candidate, questions);
             return;
         }
     }
 
-    private void createHumanGame(MatchmakingCandidate candidate, Set<Language> union) {
+    private void createHumanGame(MatchmakingCandidate candidate, List<GameQuestion> questions) {
         String gameId = UUID.randomUUID().toString();
         PlayerSummary me = playerPort.getPlayer(playerId);
         PlayerSummary opponent = playerPort.getPlayer(candidate.playerId());
@@ -150,11 +167,11 @@ public class MatchmakingSaga {
                     nameOf(me),
                     candidate.playerId(),
                     nameOf(opponent),
-                    union,
                     GamePlayerType.HUMAN,
                     null,
                     new PlayerProgressSnapshot(me.level(), me.xpTotal()),
-                    new PlayerProgressSnapshot(opponent.level(), opponent.xpTotal())));
+                    new PlayerProgressSnapshot(opponent.level(), opponent.xpTotal()),
+                    questions));
             commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
                     matchmakingId, candidate.playerId(), gameId, false));
             commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
@@ -168,7 +185,7 @@ public class MatchmakingSaga {
         }
     }
 
-    @DeadlineHandler(deadlineName = LobbyDeadline.MATCHMAKING_DEADLINE)
+    @DeadlineHandler(deadlineName = MatchmakingDeadline.MATCHMAKING_DEADLINE)
     public void onDeadline() {
         if (finished) {
             return;
@@ -176,6 +193,16 @@ public class MatchmakingSaga {
         logger.info("Timeout matchmaking — partie bot: matchmakingId={}", matchmakingId);
         String gameId = UUID.randomUUID().toString();
         PlayerSummary me = playerPort.getPlayer(playerId);
+        Set<Language> ownLanguages = languages == null ? Set.of() : Set.copyOf(languages);
+        List<GameQuestion> questions = questionDrawService.draw(topicId, ownLanguages);
+        if (questions.size() < GameRules.TOTAL_ROUNDS) {
+            logger.warn("Questions insuffisantes pour la partie bot: matchmakingId={}, topic={}, questions={}",
+                    matchmakingId, topicId, questions.size());
+            commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(
+                    matchmakingId, "TOPIC_NOT_AVAILABLE_IN_LANGUAGE"));
+            this.finished = true;
+            return;
+        }
         try {
             commandGateway.sendAndWait(new GameCommand.CreateGameCommand(
                     gameId,
@@ -184,11 +211,11 @@ public class MatchmakingSaga {
                     nameOf(me),
                     QuizUpConstants.SYSTEM_USER_ID,
                     QuizUpConstants.SYSTEM_USER_NAME,
-                    languages == null ? Set.of() : Set.copyOf(languages),
                     GamePlayerType.BOT,
                     null,
                     new PlayerProgressSnapshot(me.level(), me.xpTotal()),
-                    PlayerProgressSnapshot.forBot(null)));
+                    PlayerProgressSnapshot.forBot(null),
+                    questions));
             commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
                     matchmakingId, null, gameId, true));
         } catch (Exception exception) {
@@ -219,7 +246,7 @@ public class MatchmakingSaga {
         this.finished = true;
     }
 
-    @DeadlineHandler(deadlineName = LobbyDeadline.MATCHMAKING_PURGE)
+    @DeadlineHandler(deadlineName = MatchmakingDeadline.MATCHMAKING_PURGE)
     public void onPurge() {
         commandGateway.send(new MatchmakingCommand.PurgeMatchmakingCommand(matchmakingId));
     }
@@ -234,22 +261,22 @@ public class MatchmakingSaga {
     private void schedulePurge() {
         if (purgeDeadlineId == null) {
             purgeDeadlineId = deadlineManager.schedule(
-                    LobbyDeadline.MATCHMAKING_RETENTION_DURATION,
-                    LobbyDeadline.MATCHMAKING_PURGE);
+                    MatchmakingDeadline.MATCHMAKING_RETENTION_DURATION,
+                    MatchmakingDeadline.MATCHMAKING_PURGE);
         }
     }
 
     private void cancelDeadlines() {
         cancelDeadline();
         if (purgeDeadlineId != null) {
-            deadlineManager.cancelSchedule(LobbyDeadline.MATCHMAKING_PURGE, purgeDeadlineId);
+            deadlineManager.cancelSchedule(MatchmakingDeadline.MATCHMAKING_PURGE, purgeDeadlineId);
             purgeDeadlineId = null;
         }
     }
 
     private void cancelDeadline() {
         if (deadlineId != null) {
-            deadlineManager.cancelSchedule(LobbyDeadline.MATCHMAKING_DEADLINE, deadlineId);
+            deadlineManager.cancelSchedule(MatchmakingDeadline.MATCHMAKING_DEADLINE, deadlineId);
             deadlineId = null;
         }
     }

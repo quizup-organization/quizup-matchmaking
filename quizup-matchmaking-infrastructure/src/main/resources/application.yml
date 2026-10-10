@@ -16,7 +16,7 @@ spring:
 
 microservice:
   swagger:
-    description: QuizUp Matchmaking Module - Lobby-based player matching
+    description: QuizUp Matchmaking Module - Room-based player matching
   websocket:
     # Surface REST/WS portée par le BFF ; les services sont headless.
     enabled: false

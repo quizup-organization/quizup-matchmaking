@@ -5,10 +5,6 @@ import io.github.quizup.matchmaking.domain.event.ChallengeEvent;
 import io.github.quizup.matchmaking.domain.exception.ChallengeExceptions;
 import io.github.quizup.matchmaking.domain.model.ChallengeDeadline;
 import io.github.quizup.matchmaking.domain.model.ChallengeStatus;
-import io.github.quizup.matchmaking.domain.model.LobbyPlayer;
-import io.github.quizup.matchmaking.domain.port.out.ProfileRepositoryPort;
-import io.github.quizup.matchmaking.domain.port.out.TopicAvailabilityPort;
-import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import org.apache.commons.lang3.StringUtils;
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventsourcing.EventSourcingHandler;
@@ -19,18 +15,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.Set;
 
 import static org.axonframework.modelling.command.AggregateLifecycle.apply;
 
 /**
  * ChallengeAggregate — défi nominatif : intention asynchrone « A défie B » sur un sujet.
  * <p>
- * Ne porte **ni présence ni temps réel** : l'acceptation crée une salle (saga) qui ouvre le
- * cycle de vie temps réel (présence, ready check, partie). Le défi se contente de la réponse
- * (accepté/refusé/annulé/expiré) ; le lien vers la salle est dérivé
- * ({@code ChallengeRoomId}) et vit dans le read model, jamais dans l'agrégat.
+ * Ne porte **ni présence ni temps réel**, et ne valide **pas la faisabilité** du duel
+ * (couverture linguistique, questions disponibles) : ce travail appartient à la salle, qui
+ * prépare la partie et annonce l'échec aux joueurs présents. L'agrégat se limite aux invariants
+ * d'intégrité de la commande (identifiants, pas d'auto-défi, statut) et au lien dérivé vers la
+ * salle ({@code ChallengeRoomId}).
  */
 @Aggregate
 public class ChallengeAggregate {
@@ -47,25 +42,13 @@ public class ChallengeAggregate {
     protected ChallengeAggregate() {
     }
 
-    /** Ouvre un défi nominatif ; le thème doit couvrir les langues des deux joueurs. */
+    /** Ouvre un défi nominatif ; la faisabilité du duel sera vérifiée par la salle. */
     @CommandHandler
-    public ChallengeAggregate(ChallengeCommand.CreateChallengeCommand command,
-                              ProfileRepositoryPort profileRepositoryPort,
-                              TopicAvailabilityPort topicAvailabilityPort) {
-        if (StringUtils.isBlank(command.challengerId())) {
-            throw new ChallengeExceptions.MissingChallengerIdentifierProblem(command.challengeId());
-        }
-        if (StringUtils.isBlank(command.topicId())) {
-            throw new ChallengeExceptions.MissingTopicIdentifierProblem(command.challengeId());
-        }
-        if (StringUtils.isBlank(command.opponentId())) {
-            throw new ChallengeExceptions.MissingOpponentIdentifierProblem(command.challengeId());
-        }
-        if (command.opponentId().equals(command.challengerId())) {
-            throw new ChallengeExceptions.CannotChallengeSelfProblem(command.challengeId(), command.challengerId());
-        }
-        requireTopicCoversLanguages(profileRepositoryPort, topicAvailabilityPort,
-                command.challengerId(), command.opponentId(), command.topicId(), command.challengeId());
+    public ChallengeAggregate(ChallengeCommand.CreateChallengeCommand command) {
+        requireChallengerId(command.challengerId(), command.challengeId());
+        requireTopicId(command.topicId(), command.challengeId());
+        requireOpponentId(command.opponentId(), command.challengeId());
+        requireOpponentNotSelf(command.opponentId(), command.challengerId(), command.challengeId());
 
         logger.info("Creating challenge: challengeId={}, topicId={}, challengerId={}, opponentId={}",
                 command.challengeId(), command.topicId(), command.challengerId(), command.opponentId());
@@ -126,6 +109,32 @@ public class ChallengeAggregate {
 
     // ---------------------------------------------------------------------
 
+    // ── Validateurs (requireXxx : nommés, appelés en tête de handler) ──
+
+    private static void requireChallengerId(String challengerId, String challengeId) {
+        if (StringUtils.isBlank(challengerId)) {
+            throw new ChallengeExceptions.MissingChallengerIdentifierProblem(challengeId);
+        }
+    }
+
+    private static void requireTopicId(String topicId, String challengeId) {
+        if (StringUtils.isBlank(topicId)) {
+            throw new ChallengeExceptions.MissingTopicIdentifierProblem(challengeId);
+        }
+    }
+
+    private static void requireOpponentId(String opponentId, String challengeId) {
+        if (StringUtils.isBlank(opponentId)) {
+            throw new ChallengeExceptions.MissingOpponentIdentifierProblem(challengeId);
+        }
+    }
+
+    private static void requireOpponentNotSelf(String opponentId, String challengerId, String challengeId) {
+        if (opponentId.equals(challengerId)) {
+            throw new ChallengeExceptions.CannotChallengeSelfProblem(challengeId, challengerId);
+        }
+    }
+
     private void requirePending() {
         if (status != ChallengeStatus.PENDING) {
             throw new ChallengeExceptions.ChallengeNotPendingProblem(challengeId, status.name());
@@ -135,26 +144,6 @@ public class ChallengeAggregate {
     private void requireOpponent(String playerId) {
         if (StringUtils.isBlank(playerId) || !playerId.equals(opponentId)) {
             throw new ChallengeExceptions.ChallengeNotInvitedProblem(challengeId, playerId);
-        }
-    }
-
-    private static void requireTopicCoversLanguages(ProfileRepositoryPort profileRepositoryPort,
-                                                    TopicAvailabilityPort topicAvailabilityPort,
-                                                    String challengerId,
-                                                    String opponentId,
-                                                    String topicId,
-                                                    String challengeId) {
-        Set<Language> languages = new HashSet<>();
-        LobbyPlayer challenger = profileRepositoryPort.getById(challengerId);
-        LobbyPlayer opponent = profileRepositoryPort.getById(opponentId);
-        if (challenger != null && challenger.language() != null) {
-            languages.add(challenger.language());
-        }
-        if (opponent != null && opponent.language() != null) {
-            languages.add(opponent.language());
-        }
-        if (!languages.isEmpty() && !topicAvailabilityPort.coversAllLanguages(topicId, languages)) {
-            throw new ChallengeExceptions.TopicNotAvailableInLanguageProblem(challengeId, topicId, languages);
         }
     }
 

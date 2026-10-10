@@ -1,7 +1,7 @@
 package io.github.quizup.matchmaking.domain.port.out;
 
-import io.github.quizup.matchmaking.domain.model.LobbyPlayer;
+import io.github.quizup.matchmaking.domain.model.RoomPlayer;
 
 public interface ProfileRepositoryPort {
-    LobbyPlayer getById(String identifier);
+    RoomPlayer getById(String identifier);
 }

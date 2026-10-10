@@ -5,23 +5,22 @@ import lombok.Builder;
 import java.time.Instant;
 
 /**
- * Read model d'un salon privé (salle d'attente). L'identifiant de l'agrégat sert de référence
- * de partage (`/join/{lobbyId}`) — pas de code dédié.
+ * Read model d'une salle (salle d'attente temps réel). L'identifiant de l'agrégat sert de
+ * référence de partage (`/join/{roomId}`) — pas de code dédié.
  */
 @Builder(toBuilder = true)
-public record Lobby(
-        String lobbyId,
+public record Room(
+        String roomId,
         String topicId,
         String initiatorId,
         String opponentId,
         String participantId,
         String gameId,
-        LobbyStatus status,
+        RoomStatus status,
         boolean initiatorPresent,
         boolean participantPresent,
         Instant allPresentAt,
         Instant readyDeadlineAt,
-        String missedReason,
         Instant createdAt,
         Instant expiresAt,
         Instant updatedAt

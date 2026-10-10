@@ -1,6 +1,6 @@
 package io.github.quizup.matchmaking.application.handler.query;
 
-import io.github.quizup.matchmaking.domain.exception.LobbyExceptions;
+import io.github.quizup.matchmaking.domain.exception.MatchmakingExceptions;
 import io.github.quizup.matchmaking.domain.model.Matchmaking;
 import io.github.quizup.matchmaking.domain.port.out.MatchmakingEventStorePort;
 import io.github.quizup.matchmaking.domain.port.out.MatchmakingRepositoryPort;
@@ -26,7 +26,7 @@ public class MatchmakingQueryHandler {
     @QueryHandler
     public Matchmaking handle(MatchmakingQuery.GetMatchmakingByIdQuery query) {
         return matchmakingRepositoryPort.findById(query.matchmakingId())
-                .orElseThrow(() -> new LobbyExceptions.MatchmakingNotFoundProblem(query.matchmakingId()));
+                .orElseThrow(() -> new MatchmakingExceptions.MatchmakingNotFoundProblem(query.matchmakingId()));
     }
 
     @QueryHandler
