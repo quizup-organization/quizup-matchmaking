@@ -18,6 +18,7 @@ CREATE TABLE matchmaking_entry (
     status         VARCHAR(20)  NOT NULL,   -- SEARCHING, CLOSED, FAILED
     claimed_by     VARCHAR(255),            -- réservation atomique du pool (le statut reste SEARCHING)
     created_at     TIMESTAMP    NOT NULL,
+    deadline_at    TIMESTAMP    NOT NULL,   -- fin de recherche (repli bot), exposée au client
     updated_at     TIMESTAMP    NOT NULL,
     PRIMARY KEY (matchmaking_id)
 );

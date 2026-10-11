@@ -64,7 +64,6 @@ public class RoomProjection {
     public void on(RoomEvent.RoomAllPlayersPresentEvent event) {
         update(event.roomId(), room -> room.toBuilder()
                 .status(RoomStatus.FETCHING_PLAYERS)
-                .readyDeadlineAt(event.readyDeadlineAt())
                 .updatedAt(event.presentAt())
                 .build());
     }
@@ -78,11 +77,13 @@ public class RoomProjection {
                 .build());
     }
 
+    /** Fin de préparation : le compte à rebours de lancement démarre (échéance exposée au client). */
     @EventHandler
     @Transactional
     public void on(RoomEvent.RoomQuestionsLoadedEvent event) {
         update(event.roomId(), room -> room.toBuilder()
                 .status(RoomStatus.CREATING_GAME)
+                .readyDeadlineAt(event.readyDeadlineAt())
                 .updatedAt(event.loadedAt())
                 .build());
     }

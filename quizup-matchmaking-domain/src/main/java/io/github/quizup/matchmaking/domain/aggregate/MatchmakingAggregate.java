@@ -3,6 +3,7 @@ package io.github.quizup.matchmaking.domain.aggregate;
 import io.github.quizup.matchmaking.domain.command.MatchmakingCommand;
 import io.github.quizup.matchmaking.domain.event.MatchmakingEvent;
 import io.github.quizup.matchmaking.domain.exception.MatchmakingExceptions;
+import io.github.quizup.matchmaking.domain.model.MatchmakingDeadline;
 import io.github.quizup.matchmaking.domain.model.MatchmakingStatus;
 import org.apache.commons.lang3.StringUtils;
 import org.axonframework.commandhandling.CommandHandler;
@@ -46,13 +47,15 @@ public class MatchmakingAggregate {
         requireTopicId(command.topicId(), command.matchmakingId());
         logger.info("Starting matchmaking: matchmakingId={}, playerId={}, topicId={}, level={}",
                 command.matchmakingId(), command.playerId(), command.topicId(), command.level());
+        Instant now = Instant.now();
         apply(new MatchmakingEvent.MatchmakingStartedEvent(
                 command.matchmakingId(),
                 command.playerId(),
                 command.topicId(),
                 command.level(),
                 command.languages(),
-                Instant.now()));
+                now,
+                now.plus(MatchmakingDeadline.MATCHMAKING_DEADLINE_DURATION)));
     }
 
     @CommandHandler

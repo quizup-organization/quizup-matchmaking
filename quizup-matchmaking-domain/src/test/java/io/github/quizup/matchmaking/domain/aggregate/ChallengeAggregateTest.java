@@ -27,17 +27,27 @@ class ChallengeAggregateTest {
     @Test
     void create_appliesCreatedEvent() {
         fixture.givenNoPriorActivity()
-                .when(new ChallengeCommand.CreateChallengeCommand(CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT))
+                .when(new ChallengeCommand.CreateChallengeCommand(CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT, null))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         ChallengeEvent.ChallengeCreatedEvent.class,
                         e -> CHALLENGE_ID.equals(((ChallengeEvent.ChallengeCreatedEvent) e).challengeId())
-                                && OPPONENT.equals(((ChallengeEvent.ChallengeCreatedEvent) e).opponentId())));
+                                && OPPONENT.equals(((ChallengeEvent.ChallengeCreatedEvent) e).opponentId())
+                                && ((ChallengeEvent.ChallengeCreatedEvent) e).gameId() == null));
+    }
+
+    @Test
+    void create_rematchCarriesSourceGameId() {
+        fixture.givenNoPriorActivity()
+                .when(new ChallengeCommand.CreateChallengeCommand(CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT, "game-1"))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        ChallengeEvent.ChallengeCreatedEvent.class,
+                        e -> "game-1".equals(((ChallengeEvent.ChallengeCreatedEvent) e).gameId())));
     }
 
     @Test
     void cannotChallengeSelf() {
         fixture.givenNoPriorActivity()
-                .when(new ChallengeCommand.CreateChallengeCommand(CHALLENGE_ID, TOPIC, CHALLENGER, CHALLENGER))
+                .when(new ChallengeCommand.CreateChallengeCommand(CHALLENGE_ID, TOPIC, CHALLENGER, CHALLENGER, null))
                 .expectException(ChallengeExceptions.CannotChallengeSelfProblem.class);
     }
 
@@ -116,7 +126,7 @@ class ChallengeAggregateTest {
 
     private static ChallengeEvent.ChallengeCreatedEvent created() {
         return new ChallengeEvent.ChallengeCreatedEvent(
-                CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT,
+                CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT, null,
                 Instant.now().plusSeconds(3600), Instant.now());
     }
 

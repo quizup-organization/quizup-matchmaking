@@ -40,6 +40,10 @@ public class ChallengeEntity {
     @Column(name = "room_id")
     private String roomId;
 
+    /** Partie terminée d'origine d'une revanche (null pour un défi normal). */
+    @Column(name = "game_id")
+    private String gameId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private ChallengeStatus status;

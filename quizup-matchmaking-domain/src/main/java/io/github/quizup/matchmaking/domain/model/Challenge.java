@@ -7,7 +7,8 @@ import java.time.Instant;
 /**
  * Read model d'un défi nominatif : intention asynchrone « A défie B », sans présence ni temps réel.
  * Une fois accepté, il expose la salle (`roomId`, dérivé de façon déterministe) qui porte la
- * présence et le lancement.
+ * présence et le lancement. {@code gameId} référence la <b>partie terminée d'origine</b> d'une
+ * revanche ({@code null} pour un défi normal).
  */
 @Builder(toBuilder = true)
 public record Challenge(
@@ -15,6 +16,7 @@ public record Challenge(
         String topicId,
         String challengerId,
         String opponentId,
+        String gameId,
         String roomId,
         ChallengeStatus status,
         Instant createdAt,

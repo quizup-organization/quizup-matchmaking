@@ -46,10 +46,12 @@ import java.util.UUID;
  *   <li>{@code RoomCreatedEvent} → expiration de la salle (1 jour) ; salle {@code vsBot} : join
  *       automatique du bot.</li>
  *   <li>{@code RoomEnteredEvent} → mémorise le participant (apparition client-driven).</li>
- *   <li>{@code RoomAllPlayersPresentEvent} → étape <b>profils</b> ({@link ProfileRepositoryPort},
- *       bot exclu) puis étape <b>questions</b> ({@link QuestionDrawPort}, vérification du sujet
- *       n°2) pendant le compte à rebours ; chaque étape avance le statut de la salle.
- *       Questions insuffisantes → échec immédiat de la salle.</li>
+ *   <li>{@code RoomAllPlayersPresentEvent} → démarre la préparation : étape <b>profils</b>
+ *       ({@link ProfileRepositoryPort}, bot exclu) puis étape <b>questions</b>
+ *       ({@link QuestionDrawPort}, vérification du sujet n°2) ; chaque étape avance le statut de
+ *       la salle. Questions insuffisantes → échec immédiat de la salle.</li>
+ *   <li>{@code RoomQuestionsLoadedEvent} → fin de préparation : arme le compte à rebours de
+ *       lancement (3 s).</li>
  *   <li>Fin du compte à rebours → création de la partie (questions fournies dans la commande)
  *       puis clôture de la salle ; échec → {@code RoomFailedEvent} annoncé aux joueurs présents.</li>
  *   <li>{@code RoomLeftEvent} (sortie non destructive avant engagement) → compte à rebours
@@ -164,21 +166,27 @@ public class RoomSaga {
     }
 
     /**
-     * Les deux joueurs sont présents : démarre le compte à rebours et lance la préparation
-     * (profils puis questions) pendant la fenêtre de 3 s. Chaque étape avance le statut de la
-     * salle ; l'échec de préparation est annoncé immédiatement aux joueurs présents.
+     * Les deux joueurs sont présents : lance la préparation (profils puis questions). Le compte à
+     * rebours de lancement n'est armé qu'à la fin de la préparation
+     * ({@link RoomEvent.RoomQuestionsLoadedEvent}).
      */
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomAllPlayersPresentEvent event) {
+        logger.info("Les deux joueurs sont présents, préparation de la partie: roomId={}", roomId);
+        loadPlayers();
+        loadQuestions();
+    }
+
+    /** Fin de préparation (questions tirées) : arme le compte à rebours de lancement. */
+    @SagaEventHandler(associationProperty = "roomId")
+    public void on(RoomEvent.RoomQuestionsLoadedEvent event) {
         if (readyDeadlineId == null) {
             readyDeadlineId = deadlineManager.schedule(
                     RoomDeadline.ROOM_READY_CHECK_DURATION,
                     RoomDeadline.ROOM_READY_CHECK);
         }
-        logger.info("Les deux joueurs sont présents, lancement dans {}s: roomId={}",
+        logger.info("Préparation terminée, lancement dans {}s: roomId={}",
                 RoomDeadline.ROOM_READY_CHECK_DURATION.toSeconds(), roomId);
-        loadPlayers();
-        loadQuestions();
     }
 
     /** Étape profils : le bot n'a pas de profil à résoudre. */
@@ -213,12 +221,12 @@ public class RoomSaga {
     }
 
     /**
-     * Sortie d'un joueur avant engagement (non destructive) : le compte à rebours de lancement
-     * est annulé ; la salle reste ouverte jusqu'à son expiration, le joueur peut revenir.
+     * Sortie d'un joueur avant engagement (non destructive) : la salle reste ouverte jusqu'à son
+     * expiration, le joueur peut revenir. La préparation n'est pas engagée (sortie possible
+     * uniquement en {@code WAITING_PLAYERS}), aucun compte à rebours à annuler.
      */
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomLeftEvent event) {
-        cancelReadyDeadline();
         logger.info("Joueur sorti de la salle (retour possible jusqu'à l'expiration): roomId={}, playerId={}",
                 roomId, event.playerId());
     }

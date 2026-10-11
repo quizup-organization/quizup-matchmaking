@@ -7,6 +7,7 @@ CREATE TABLE challenge_entry (
     topic_id      VARCHAR(255) NOT NULL,
     challenger_id VARCHAR(255) NOT NULL,
     opponent_id   VARCHAR(255) NOT NULL,
+    game_id       VARCHAR(255),            -- partie terminée d'origine d'une revanche (null = défi normal)
     room_id       VARCHAR(255),
     status        VARCHAR(20)  NOT NULL,   -- PENDING, ACCEPTED, DECLINED, CANCELLED, EXPIRED
     created_at    TIMESTAMP    NOT NULL,

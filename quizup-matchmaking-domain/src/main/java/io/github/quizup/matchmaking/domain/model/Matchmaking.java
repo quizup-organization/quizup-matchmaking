@@ -21,6 +21,7 @@ public record Matchmaking(
         boolean vsBot,
         MatchmakingStatus status,
         Instant createdAt,
+        Instant deadlineAt,
         Instant updatedAt
 ) {
 }

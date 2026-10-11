@@ -55,6 +55,10 @@ public class MatchmakingEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /** Échéance de recherche (repli bot) exposée au client pour le compte à rebours. */
+    @Column(name = "deadline_at", nullable = false)
+    private Instant deadlineAt;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 }

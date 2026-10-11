@@ -99,10 +99,9 @@ public class RoomAggregate {
         logger.info("Player entering room: roomId={}, playerId={}", roomId, command.playerId());
         apply(new RoomEvent.RoomEnteredEvent(roomId, command.playerId(), now));
         if (bothPresent()) {
-            apply(new RoomEvent.RoomAllPlayersPresentEvent(
-                    roomId,
-                    now.plus(RoomDeadline.ROOM_READY_CHECK_DURATION),
-                    now));
+            // La préparation démarre immédiatement ; le compte à rebours de lancement sera armé
+            // à la fin de la préparation (questions chargées).
+            apply(new RoomEvent.RoomAllPlayersPresentEvent(roomId, now));
         }
     }
 
@@ -152,14 +151,19 @@ public class RoomAggregate {
         apply(new RoomEvent.RoomPlayersLoadedEvent(roomId, Instant.now()));
     }
 
-    /** Commande interne (saga) : les questions sont tirées ; avance la préparation (monotone). */
+    /** Commande interne (saga) : les questions sont tirées ; arme le lancement (monotone). */
     @CommandHandler
     public void handle(RoomCommand.MarkRoomQuestionsLoadedCommand command) {
         if (status != RoomStatus.FETCHING_QUESTIONS) {
             return;
         }
-        logger.info("Questions loaded in room: roomId={}", roomId);
-        apply(new RoomEvent.RoomQuestionsLoadedEvent(roomId, Instant.now()));
+        Instant now = Instant.now();
+        logger.info("Questions loaded in room: roomId={}, lancement dans {}s",
+                roomId, RoomDeadline.ROOM_READY_CHECK_DURATION.toSeconds());
+        apply(new RoomEvent.RoomQuestionsLoadedEvent(
+                roomId,
+                now.plus(RoomDeadline.ROOM_READY_CHECK_DURATION),
+                now));
     }
 
     /** Succès : la partie est créée ; la salle reste lisible jusqu'à sa purge par la saga. */

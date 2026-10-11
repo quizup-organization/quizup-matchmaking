@@ -14,6 +14,7 @@ public final class ChallengeEntityMapper {
                 .topicId(entity.getTopicId())
                 .challengerId(entity.getChallengerId())
                 .opponentId(entity.getOpponentId())
+                .gameId(entity.getGameId())
                 .roomId(entity.getRoomId())
                 .status(entity.getStatus())
                 .createdAt(entity.getCreatedAt())
@@ -28,6 +29,7 @@ public final class ChallengeEntityMapper {
         entity.setTopicId(challenge.topicId());
         entity.setChallengerId(challenge.challengerId());
         entity.setOpponentId(challenge.opponentId());
+        entity.setGameId(challenge.gameId());
         entity.setRoomId(challenge.roomId());
         entity.setStatus(challenge.status());
         entity.setCreatedAt(challenge.createdAt());

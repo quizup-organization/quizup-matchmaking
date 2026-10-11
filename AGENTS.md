@@ -117,7 +117,8 @@ toutes les langues + mapping `theme.Question → DrawnQuestion` local ; la tradu
 
 ### Appariement public (`MatchmakingSaga`)
 
-- `MatchmakingStartedEvent` → planifie une deadline **5 s** ; **le dernier arrivé** initie le
+- `MatchmakingStartedEvent` → porte `deadlineAt` (fin de recherche, repli bot) et planifie une
+  deadline **5 s** ; **le dernier arrivé** initie le
   pairage : `MatchmakingPoolPort.candidates` (même sujet, niveau ±5, plus anciens), filtre par
   langues (`TopicAvailabilityPort`, **vérification du thème n°1**), `claim` atomique, puis
   `CreateRoomCommand` (salle nominative, opponentId = candidat) et `MarkMatchmakingMatchedCommand`
@@ -131,14 +132,15 @@ toutes les langues + mapping `theme.Question → DrawnQuestion` local ; la tradu
 - `RoomCreatedEvent` → expiration planifiée (**1 jour**) ; si `vsBot`, **join automatique du bot**
   (`JoinRoomCommand`, échec → `FailRoomCommand("BOT_JOIN_FAILED")`).
 - `RoomEnteredEvent` (apparition client) → mémorise le participant (non-initiateur).
-- `RoomAllPlayersPresentEvent` → **préparation** pendant le compte à rebours (**3 s**,
-  `ROOM_READY_CHECK`) : profils (`ProfileRepositoryPort`, bot exclu) → `MarkRoomPlayersLoadedCommand`
-  ; puis **vérification du thème n°2** — tirage (`QuestionDrawPort`) : questions insuffisantes →
-  `FailRoomCommand("TOPIC_NOT_AVAILABLE_IN_LANGUAGE")`, sinon `MarkRoomQuestionsLoadedCommand`.
+- `RoomAllPlayersPresentEvent` → démarre la **préparation** : étape profils puis étape questions
+  (vérification du sujet n°2) ; chaque étape avance le statut de la salle. Questions
+  insuffisantes → `FailRoomCommand` immédiat (`TOPIC_NOT_AVAILABLE_IN_LANGUAGE`).
+- `RoomQuestionsLoadedEvent` → **fin de préparation** : arme le compte à rebours de lancement
+  (**3 s**, `ROOM_READY_CHECK`, échéance portée par l'événement).
 - Fin du compte à rebours → `CreateGameCommand` **attendu** (`sendAndWait`, HUMAN/HUMAN ou
   HUMAN/BOT, mapping local → `game.GameQuestion` dans la saga) puis `CompleteRoomCommand` ; échec →
   `FailRoomCommand("GAME_CREATION_FAILED")`.
-- `RoomLeftEvent` (sortie non destructive avant engagement) → compte à rebours annulé ; le joueur
+- `RoomLeftEvent` (sortie non destructive avant engagement) → la salle reste ouverte, le joueur
   peut revenir. L'agrégat refuse la sortie ensuite (`RoomPreparationStartedProblem`).
 - `RoomCancelled|Expired|Failed|Completed` → `CANCELLED`/`EXPIRED`/`FAILED`/`COMPLETED` + purge planifiée
   (rétention 2 min) ; `RoomPurgedEvent` termine la saga (`markDeleted`).
@@ -149,9 +151,10 @@ toutes les langues + mapping `theme.Question → DrawnQuestion` local ; la tradu
   `POST /{ticketId}/cancel` ; `GET /{ticketId}/notifications` ; WS
   `/topic/matchmaking/tickets/{ticketId}` (`SEARCHING|MATCHED|CANCELLED|FAILED`) — `MATCHED` porte
   le `roomId` de la salle créée.
-- **Défis** : `POST /api/challenges { topicId, opponentId }` ; `GET /{challengeId}` ;
-  `GET /mine` ; `POST /{id}/accept|decline|cancel` — `ChallengeView.roomId` dès l'acceptation
-  (dérivé, déterministe).
+- **Défis** : `POST /api/challenges { topicId, opponentId, gameId? }` — `gameId` référence la
+  **partie terminée d'origine** d'une revanche (validée côté BFF : participation, duel humain,
+  adversaire) ; `GET /{challengeId}` / `GET /mine` exposent `ChallengeView.gameId` ;
+  `POST /{id}/accept|decline|cancel` — `ChallengeView.roomId` dès l'acceptation (dérivé, déterministe).
 - **Salles** : `POST /api/rooms { topicId }` (partagée) ; `POST /api/rooms/bot
   { topicId, difficulty? }` (le bot rejoint automatiquement) ; `GET /{roomId}` ;
   `GET /mine` (initiateur **ou** invité) ; `POST /{roomId}/join` (**apparition unique**) ;
@@ -161,7 +164,8 @@ toutes les langues + mapping `theme.Question → DrawnQuestion` local ; la tradu
 - **Notifications personnelles** : consommées par `quizup-notification` depuis le bus Kafka
   (`CHALLENGE_RECEIVED`, `CHALLENGE_DECLINED`, `ROOM_ACCEPTED`) ; poussées par le BFF sur
   `/topic/notifications/{userId}`.
-- Read models : `matchmaking_entry` (pool + ticket, colonne `room_id`), `challenge_entry`,
+- Read models : `matchmaking_entry` (pool + ticket, colonnes `room_id` et `deadline_at`),
+  `challenge_entry` (`game_id` = partie d'origine de la revanche, `room_id`),
   `room_entry` (`vs_bot`, avancement). L'agrégat reste la source de vérité ; le pool est
   reconstructible à partir des `MatchmakingStartedEvent`.
 - **Data prod** : les breaking changes des contrats sont accompagnés d'un **reset** de la data

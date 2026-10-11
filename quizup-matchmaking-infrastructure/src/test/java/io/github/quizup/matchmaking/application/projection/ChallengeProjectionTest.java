@@ -26,7 +26,7 @@ class ChallengeProjectionTest {
     @Test
     void created_savesPendingChallenge() {
         projection.on(new ChallengeEvent.ChallengeCreatedEvent(
-                "challenge-1", "topic-1", "challenger-1", "opponent-1", AT.plusSeconds(3600), AT));
+                "challenge-1", "topic-1", "challenger-1", "opponent-1", null, AT.plusSeconds(3600), AT));
 
         ArgumentCaptor<Challenge> captor = ArgumentCaptor.forClass(Challenge.class);
         verify(repository).save(captor.capture());
@@ -35,6 +35,17 @@ class ChallengeProjectionTest {
         assertThat(saved.opponentId()).isEqualTo("opponent-1");
         assertThat(saved.resolvedAt()).isNull();
         assertThat(saved.roomId()).isNull();
+        assertThat(saved.gameId()).isNull();
+    }
+
+    @Test
+    void created_rematchStoresSourceGameId() {
+        projection.on(new ChallengeEvent.ChallengeCreatedEvent(
+                "challenge-1", "topic-1", "challenger-1", "opponent-1", "game-1", AT.plusSeconds(3600), AT));
+
+        ArgumentCaptor<Challenge> captor = ArgumentCaptor.forClass(Challenge.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().gameId()).isEqualTo("game-1");
     }
 
     @Test

@@ -50,13 +50,14 @@ public class ChallengeAggregate {
         requireOpponentId(command.opponentId(), command.challengeId());
         requireOpponentNotSelf(command.opponentId(), command.challengerId(), command.challengeId());
 
-        logger.info("Creating challenge: challengeId={}, topicId={}, challengerId={}, opponentId={}",
-                command.challengeId(), command.topicId(), command.challengerId(), command.opponentId());
+        logger.info("Creating challenge: challengeId={}, topicId={}, challengerId={}, opponentId={}, gameId={}",
+                command.challengeId(), command.topicId(), command.challengerId(), command.opponentId(), command.gameId());
         apply(new ChallengeEvent.ChallengeCreatedEvent(
                 command.challengeId(),
                 command.topicId(),
                 command.challengerId(),
                 command.opponentId(),
+                command.gameId(),
                 Instant.now().plus(ChallengeDeadline.CHALLENGE_EXPIRY_DURATION),
                 Instant.now()));
     }

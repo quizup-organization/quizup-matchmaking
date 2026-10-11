@@ -33,6 +33,7 @@ public class ChallengeProjection {
                 .topicId(event.topicId())
                 .challengerId(event.challengerId())
                 .opponentId(event.opponentId())
+                .gameId(event.gameId())
                 .status(ChallengeStatus.PENDING)
                 .createdAt(event.createdAt())
                 .expiresAt(event.expiresAt())

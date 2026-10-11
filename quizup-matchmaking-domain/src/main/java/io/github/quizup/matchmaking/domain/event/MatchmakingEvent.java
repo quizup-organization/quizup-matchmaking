@@ -15,7 +15,8 @@ public interface MatchmakingEvent {
             String topicId,
             int level,
             Set<Language> languages,
-            Instant startedAt
+            Instant startedAt,
+            Instant deadlineAt
     ) implements MatchmakingEvent {
     }
 

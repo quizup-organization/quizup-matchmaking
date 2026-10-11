@@ -37,6 +37,7 @@ public class MatchmakingProjection {
                 .vsBot(false)
                 .status(MatchmakingStatus.SEARCHING)
                 .createdAt(event.startedAt())
+                .deadlineAt(event.deadlineAt())
                 .updatedAt(event.startedAt())
                 .build());
     }

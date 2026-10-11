@@ -5,6 +5,9 @@ import java.time.Instant;
 /**
  * Événements du défi nominatif (intention asynchrone). La salle temps réel (présence, ready check,
  * création de partie) porte ses propres événements.
+ * <p>
+ * {@code ChallengeCreatedEvent.gameId} référence — quand il est renseigné — la <b>partie terminée
+ * d'origine</b> d'une revanche (jamais la future partie, qui naîtra de la salle).
  */
 public interface ChallengeEvent {
 
@@ -15,6 +18,7 @@ public interface ChallengeEvent {
             String topicId,
             String challengerId,
             String opponentId,
+            String gameId,
             Instant expiresAt,
             Instant createdAt
     ) implements ChallengeEvent {

@@ -52,6 +52,7 @@ public final class MatchmakingEntityMapper {
                 .vsBot(entity.isVsBot())
                 .status(entity.getStatus())
                 .createdAt(entity.getCreatedAt())
+                .deadlineAt(entity.getDeadlineAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
     }

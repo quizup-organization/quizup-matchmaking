@@ -31,27 +31,32 @@ public interface RoomEvent {
     }
 
     /**
-     * Les deux joueurs sont présents : le compte à rebours de lancement démarre et la
-     * préparation passe en {@code FETCHING_PLAYERS}.
-     * {@code readyDeadlineAt} borne le créneau de préparation avant création de la partie.
+     * Les deux joueurs sont présents : la préparation démarre immédiatement
+     * ({@code FETCHING_PLAYERS}) ; le compte à rebours de lancement ne sera armé qu'à la fin de la
+     * préparation ({@link RoomQuestionsLoadedEvent#readyDeadlineAt()}).
      */
     record RoomAllPlayersPresentEvent(
             String roomId,
-            Instant readyDeadlineAt,
             Instant presentAt
     ) implements RoomEvent {
     }
 
-    /** Les profils des joueurs sont résolus : la préparation passe en {@code FETCHING_QUESTIONS}. */
+    /**
+     * Les profils des joueurs sont résolus : la préparation passe en {@code FETCHING_QUESTIONS}.
+     */
     record RoomPlayersLoadedEvent(
             String roomId,
             Instant loadedAt
     ) implements RoomEvent {
     }
 
-    /** Les questions sont tirées : la préparation passe en {@code CREATING_GAME}. */
+    /**
+     * Les questions sont tirées : la préparation passe en {@code CREATING_GAME} et le compte à
+     * rebours de lancement démarre ({@code readyDeadlineAt} borne la création de la partie).
+     */
     record RoomQuestionsLoadedEvent(
             String roomId,
+            Instant readyDeadlineAt,
             Instant loadedAt
     ) implements RoomEvent {
     }

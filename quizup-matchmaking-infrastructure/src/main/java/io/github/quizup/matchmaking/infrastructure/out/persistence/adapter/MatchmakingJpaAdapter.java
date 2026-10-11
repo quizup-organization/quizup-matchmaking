@@ -65,6 +65,7 @@ public class MatchmakingJpaAdapter implements MatchmakingPoolPort, MatchmakingRe
         entity.setVsBot(matchmaking.vsBot());
         entity.setStatus(matchmaking.status());
         entity.setCreatedAt(matchmaking.createdAt());
+        entity.setDeadlineAt(matchmaking.deadlineAt());
         entity.setUpdatedAt(matchmaking.updatedAt());
         repository.save(entity);
     }

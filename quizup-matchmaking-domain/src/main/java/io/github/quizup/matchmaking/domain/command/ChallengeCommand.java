@@ -3,7 +3,9 @@ package io.github.quizup.matchmaking.domain.command;
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
 /**
- * Commandes du défi nominatif (intention asynchrone).
+ * Commandes du défi nominatif (intention asynchrone). {@code gameId} référence — quand il est
+ * renseigné — la <b>partie terminée d'origine</b> d'une revanche (jamais la future partie, qui
+ * naîtra de la salle) ; {@code null} pour un défi normal.
  */
 public interface ChallengeCommand {
 
@@ -14,7 +16,8 @@ public interface ChallengeCommand {
             @TargetAggregateIdentifier String challengeId,
             String topicId,
             String challengerId,
-            String opponentId
+            String opponentId,
+            String gameId
     ) implements ChallengeCommand {
     }
 
