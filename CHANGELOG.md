@@ -1,3 +1,13 @@
+## [9.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v8.0.0...v9.0.0) (2026-10-11)
+
+### ⚠ BREAKING CHANGES
+
+* **matchmaking:** création immédiate de la partie en fin de préparation (purge du chrono de salle)
+
+### Features
+
+* **matchmaking:** création immédiate de la partie en fin de préparation (purge du chrono de salle) ([cc3e722](https://github.com/quizup-organization/quizup-matchmaking/commit/cc3e722ad4e3fb3fbb03b1ed62507554869b2965))
+
 ## [8.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v7.0.0...v8.0.0) (2026-10-11)
 
 ### ⚠ BREAKING CHANGES
