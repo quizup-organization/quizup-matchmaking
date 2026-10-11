@@ -20,7 +20,6 @@ public final class RoomEntityMapper {
                 .status(entity.getStatus())
                 .initiatorPresent(entity.isInitiatorPresent())
                 .participantPresent(entity.isParticipantPresent())
-                .readyDeadlineAt(entity.getReadyDeadlineAt())
                 .createdAt(entity.getCreatedAt())
                 .expiresAt(entity.getExpiresAt())
                 .updatedAt(entity.getUpdatedAt())
@@ -39,7 +38,6 @@ public final class RoomEntityMapper {
         entity.setStatus(room.status());
         entity.setInitiatorPresent(room.initiatorPresent());
         entity.setParticipantPresent(room.participantPresent());
-        entity.setReadyDeadlineAt(room.readyDeadlineAt());
         entity.setCreatedAt(room.createdAt());
         entity.setExpiresAt(room.expiresAt());
         entity.setUpdatedAt(room.updatedAt());

@@ -54,9 +54,6 @@ public class RoomEntity {
     @Column(name = "participant_present", nullable = false)
     private boolean participantPresent;
 
-    @Column(name = "ready_deadline_at")
-    private Instant readyDeadlineAt;
-
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

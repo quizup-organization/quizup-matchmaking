@@ -30,8 +30,9 @@ Trois responsabilités **distinctes**, chacune avec son agrégat :
   quand l'utilisateur est réellement dans la salle : elle porte la présence et, pour le second
   joueur, l'enregistrement du participant. Seule exception système : le join automatique du bot
   sur une salle `vsBot` (émis par `RoomSaga`). `RoomSaga` est le **seul créateur de partie** : elle
-  prépare la partie pendant le compte à rebours (**vérification du thème n°2** : profils + tirage
-  des questions), avance le statut de préparation et, en cas d'échec, **annonce l'échec** aux
+  prépare la partie dès les deux joueurs présents (**vérification du thème n°2** : profils + tirage
+  des questions) et la **crée immédiatement en fin de préparation** (aucun compte à rebours de
+  lancement), avance le statut de préparation et, en cas d'échec, **annonce l'échec** aux
   joueurs présents (`RoomFailedEvent` → `ROOM_FAILED`). Un salon non lancé expire après **1 jour** ;
   tant que la préparation n'est pas engagée, une **sortie explicite est non destructive** (le
   joueur peut revenir) ; dès que les deux sont présents, la sortie est refusée — l'initiateur peut
@@ -45,8 +46,8 @@ Trois responsabilités **distinctes**, chacune avec son agrégat :
   COMPLETED | CANCELLED | EXPIRED | FAILED` : le statut suit l'**avancement de la préparation** et est poussé au
   client (WS + `RoomView`).
   - `WAITING_PLAYERS` → `ALL_PRESENT` → `FETCHING_PLAYERS` → `MarkRoomPlayersLoadedCommand` →
-    `FETCHING_QUESTIONS` → `MarkRoomQuestionsLoadedCommand` → `CREATING_GAME` (compte à rebours) →
-    `CompleteRoomCommand` → `COMPLETED`.
+    `FETCHING_QUESTIONS` → `MarkRoomQuestionsLoadedCommand` → `CREATING_GAME` (création immédiate
+    de la partie) → `CompleteRoomCommand` → `COMPLETED`.
   - `CANCELLED` = annulée par l'initiateur ; `EXPIRED` = jamais lancée, expirée ;
     `FAILED` = échec de préparation/création.
 - **Aucune suppression immédiate** : l'agrégat reste joignable pendant la **rétention**
@@ -135,11 +136,9 @@ toutes les langues + mapping `theme.Question → DrawnQuestion` local ; la tradu
 - `RoomAllPlayersPresentEvent` → démarre la **préparation** : étape profils puis étape questions
   (vérification du sujet n°2) ; chaque étape avance le statut de la salle. Questions
   insuffisantes → `FailRoomCommand` immédiat (`TOPIC_NOT_AVAILABLE_IN_LANGUAGE`).
-- `RoomQuestionsLoadedEvent` → **fin de préparation** : arme le compte à rebours de lancement
-  (**3 s**, `ROOM_READY_CHECK`, échéance portée par l'événement).
-- Fin du compte à rebours → `CreateGameCommand` **attendu** (`sendAndWait`, HUMAN/HUMAN ou
-  HUMAN/BOT, mapping local → `game.GameQuestion` dans la saga) puis `CompleteRoomCommand` ; échec →
-  `FailRoomCommand("GAME_CREATION_FAILED")`.
+- `RoomQuestionsLoadedEvent` → **fin de préparation** : `CreateGameCommand` **attendu**
+  (`sendAndWait`, HUMAN/HUMAN ou HUMAN/BOT, mapping local → `game.GameQuestion` dans la saga) puis
+  `CompleteRoomCommand` ; échec → `FailRoomCommand("GAME_CREATION_FAILED")`.
 - `RoomLeftEvent` (sortie non destructive avant engagement) → la salle reste ouverte, le joueur
   peut revenir. L'agrégat refuse la sortie ensuite (`RoomPreparationStartedProblem`).
 - `RoomCancelled|Expired|Failed|Completed` → `CANCELLED`/`EXPIRED`/`FAILED`/`COMPLETED` + purge planifiée

@@ -77,13 +77,12 @@ public class RoomProjection {
                 .build());
     }
 
-    /** Fin de préparation : le compte à rebours de lancement démarre (échéance exposée au client). */
+    /** Fin de préparation : la partie est créée immédiatement (statut de lancement). */
     @EventHandler
     @Transactional
     public void on(RoomEvent.RoomQuestionsLoadedEvent event) {
         update(event.roomId(), room -> room.toBuilder()
                 .status(RoomStatus.CREATING_GAME)
-                .readyDeadlineAt(event.readyDeadlineAt())
                 .updatedAt(event.loadedAt())
                 .build());
     }

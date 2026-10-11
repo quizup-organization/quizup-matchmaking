@@ -74,7 +74,7 @@ public class RoomAggregate {
     /**
      * Apparition d'un joueur dans la salle : présence temps réel et, pour le second humain,
      * enregistrement implicite comme participant. Idempotent ; quand les deux sont présents, la
-     * salle passe en préparation ({@code FETCHING_PLAYERS}) et arme le compte à rebours.
+     * salle passe en préparation ({@code FETCHING_PLAYERS}).
      */
     @CommandHandler
     public void handle(RoomCommand.JoinRoomCommand command) {
@@ -99,8 +99,8 @@ public class RoomAggregate {
         logger.info("Player entering room: roomId={}, playerId={}", roomId, command.playerId());
         apply(new RoomEvent.RoomEnteredEvent(roomId, command.playerId(), now));
         if (bothPresent()) {
-            // La préparation démarre immédiatement ; le compte à rebours de lancement sera armé
-            // à la fin de la préparation (questions chargées).
+            // La préparation démarre immédiatement ; la partie sera créée dès les questions
+            // tirées (plus de compte à rebours de lancement).
             apply(new RoomEvent.RoomAllPlayersPresentEvent(roomId, now));
         }
     }
@@ -151,19 +151,14 @@ public class RoomAggregate {
         apply(new RoomEvent.RoomPlayersLoadedEvent(roomId, Instant.now()));
     }
 
-    /** Commande interne (saga) : les questions sont tirées ; arme le lancement (monotone). */
+    /** Commande interne (saga) : les questions sont tirées ; la partie est créée immédiatement. */
     @CommandHandler
     public void handle(RoomCommand.MarkRoomQuestionsLoadedCommand command) {
         if (status != RoomStatus.FETCHING_QUESTIONS) {
             return;
         }
-        Instant now = Instant.now();
-        logger.info("Questions loaded in room: roomId={}, lancement dans {}s",
-                roomId, RoomDeadline.ROOM_READY_CHECK_DURATION.toSeconds());
-        apply(new RoomEvent.RoomQuestionsLoadedEvent(
-                roomId,
-                now.plus(RoomDeadline.ROOM_READY_CHECK_DURATION),
-                now));
+        logger.info("Questions loaded in room: roomId={}, création de la partie immédiate", roomId);
+        apply(new RoomEvent.RoomQuestionsLoadedEvent(roomId, Instant.now()));
     }
 
     /** Succès : la partie est créée ; la salle reste lisible jusqu'à sa purge par la saga. */

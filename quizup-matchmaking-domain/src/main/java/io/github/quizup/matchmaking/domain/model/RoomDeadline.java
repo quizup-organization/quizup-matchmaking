@@ -13,11 +13,6 @@ public interface RoomDeadline {
 
     Duration ROOM_EXPIRY_DURATION = Duration.ofDays(1);
 
-    /** Compte à rebours court de préparation avant création de la partie, une fois les deux présents. */
-    String ROOM_READY_CHECK = "room-ready-check";
-
-    Duration ROOM_READY_CHECK_DURATION = Duration.ofSeconds(3);
-
     /** Rétention d'un état terminal (annulé/expiré/échoué) avant purge : le client lit l'état. */
     String ROOM_PURGE = "room-purge";
 

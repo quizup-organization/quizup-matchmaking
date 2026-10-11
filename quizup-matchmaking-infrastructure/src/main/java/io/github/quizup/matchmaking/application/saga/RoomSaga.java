@@ -50,12 +50,12 @@ import java.util.UUID;
  *       ({@link ProfileRepositoryPort}, bot exclu) puis étape <b>questions</b>
  *       ({@link QuestionDrawPort}, vérification du sujet n°2) ; chaque étape avance le statut de
  *       la salle. Questions insuffisantes → échec immédiat de la salle.</li>
- *   <li>{@code RoomQuestionsLoadedEvent} → fin de préparation : arme le compte à rebours de
- *       lancement (3 s).</li>
- *   <li>Fin du compte à rebours → création de la partie (questions fournies dans la commande)
+ *   <li>{@code RoomQuestionsLoadedEvent} → fin de préparation : création immédiate de la partie
+ *       (plus de compte à rebours de lancement).</li>
+ *   <li>Création de la partie (questions fournies dans la commande)
  *       puis clôture de la salle ; échec → {@code RoomFailedEvent} annoncé aux joueurs présents.</li>
- *   <li>{@code RoomLeftEvent} (sortie non destructive avant engagement) → compte à rebours
- *       annulé ; retour possible. La sortie est refusée par l'agrégat une fois la préparation
+ *   <li>{@code RoomLeftEvent} (sortie non destructive avant engagement) → retour possible. La
+ *       sortie est refusée par l'agrégat une fois la préparation
  *       engagée.</li>
  *   <li>États terminaux → purge après rétention ; {@code RoomPurgedEvent} termine la saga.</li>
  * </ul>
@@ -105,10 +105,6 @@ public class RoomSaga {
     @Getter
     @Setter
     private String expiryDeadlineId;
-
-    @Getter
-    @Setter
-    private String readyDeadlineId;
 
     @Getter
     @Setter
@@ -166,9 +162,8 @@ public class RoomSaga {
     }
 
     /**
-     * Les deux joueurs sont présents : lance la préparation (profils puis questions). Le compte à
-     * rebours de lancement n'est armé qu'à la fin de la préparation
-     * ({@link RoomEvent.RoomQuestionsLoadedEvent}).
+     * Les deux joueurs sont présents : lance la préparation (profils puis questions). La partie
+     * sera créée dès la fin de la préparation ({@link RoomEvent.RoomQuestionsLoadedEvent}).
      */
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomAllPlayersPresentEvent event) {
@@ -177,16 +172,11 @@ public class RoomSaga {
         loadQuestions();
     }
 
-    /** Fin de préparation (questions tirées) : arme le compte à rebours de lancement. */
+    /** Fin de préparation (questions tirées) : la partie est créée immédiatement. */
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomQuestionsLoadedEvent event) {
-        if (readyDeadlineId == null) {
-            readyDeadlineId = deadlineManager.schedule(
-                    RoomDeadline.ROOM_READY_CHECK_DURATION,
-                    RoomDeadline.ROOM_READY_CHECK);
-        }
-        logger.info("Préparation terminée, lancement dans {}s: roomId={}",
-                RoomDeadline.ROOM_READY_CHECK_DURATION.toSeconds(), roomId);
+        logger.info("Préparation terminée, création de la partie: roomId={}", roomId);
+        createGameAndComplete();
     }
 
     /** Étape profils : le bot n'a pas de profil à résoudre. */
@@ -223,7 +213,7 @@ public class RoomSaga {
     /**
      * Sortie d'un joueur avant engagement (non destructive) : la salle reste ouverte jusqu'à son
      * expiration, le joueur peut revenir. La préparation n'est pas engagée (sortie possible
-     * uniquement en {@code WAITING_PLAYERS}), aucun compte à rebours à annuler.
+     * uniquement en {@code WAITING_PLAYERS}).
      */
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomLeftEvent event) {
@@ -231,15 +221,9 @@ public class RoomSaga {
                 roomId, event.playerId());
     }
 
-    @DeadlineHandler(deadlineName = RoomDeadline.ROOM_READY_CHECK)
-    public void onReadyCheckExpired() {
-        createGameAndComplete();
-    }
-
     /**
-     * Fin du compte à rebours : la préparation a déjà été tentée à l'apparition des deux joueurs
-     * (le handler d'événement précède toujours sa deadline) ; on ne crée la partie que si elle a
-     * abouti (sinon l'échec a déjà été annoncé et la salle est terminale).
+     * Fin de préparation : la partie est créée seulement si la préparation a abouti (sinon
+     * l'échec a déjà été annoncé et la salle est terminale).
      */
     private void createGameAndComplete() {
         if (!playersLoaded() || drawnQuestions == null || drawnQuestions.size() < GameRules.TOTAL_ROUNDS) {
@@ -290,25 +274,21 @@ public class RoomSaga {
 
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomCancelledEvent event) {
-        cancelReadyDeadline();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomExpiredEvent event) {
-        cancelReadyDeadline();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomFailedEvent event) {
-        cancelReadyDeadline();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomCompletedEvent event) {
-        cancelReadyDeadline();
         schedulePurge();
     }
 
@@ -334,7 +314,6 @@ public class RoomSaga {
 
     private void cancelAllDeadlines() {
         cancelExpiryDeadline();
-        cancelReadyDeadline();
         if (purgeDeadlineId != null) {
             deadlineManager.cancelSchedule(RoomDeadline.ROOM_PURGE, purgeDeadlineId);
             purgeDeadlineId = null;
@@ -345,13 +324,6 @@ public class RoomSaga {
         if (expiryDeadlineId != null) {
             deadlineManager.cancelSchedule(RoomDeadline.ROOM_EXPIRY, expiryDeadlineId);
             expiryDeadlineId = null;
-        }
-    }
-
-    private void cancelReadyDeadline() {
-        if (readyDeadlineId != null) {
-            deadlineManager.cancelSchedule(RoomDeadline.ROOM_READY_CHECK, readyDeadlineId);
-            readyDeadlineId = null;
         }
     }
 

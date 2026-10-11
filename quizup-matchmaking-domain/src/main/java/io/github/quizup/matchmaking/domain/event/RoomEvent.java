@@ -32,8 +32,8 @@ public interface RoomEvent {
 
     /**
      * Les deux joueurs sont présents : la préparation démarre immédiatement
-     * ({@code FETCHING_PLAYERS}) ; le compte à rebours de lancement ne sera armé qu'à la fin de la
-     * préparation ({@link RoomQuestionsLoadedEvent#readyDeadlineAt()}).
+     * ({@code FETCHING_PLAYERS}) ; la partie est créée dès la fin de la préparation
+     * ({@link RoomQuestionsLoadedEvent}).
      */
     record RoomAllPlayersPresentEvent(
             String roomId,
@@ -51,12 +51,11 @@ public interface RoomEvent {
     }
 
     /**
-     * Les questions sont tirées : la préparation passe en {@code CREATING_GAME} et le compte à
-     * rebours de lancement démarre ({@code readyDeadlineAt} borne la création de la partie).
+     * Les questions sont tirées : la préparation passe en {@code CREATING_GAME} et la partie est
+     * créée immédiatement (plus de compte à rebours de lancement).
      */
     record RoomQuestionsLoadedEvent(
             String roomId,
-            Instant readyDeadlineAt,
             Instant loadedAt
     ) implements RoomEvent {
     }

@@ -8,7 +8,7 @@ package io.github.quizup.matchmaking.domain.model;
  *   <li>{@link #FETCHING_PLAYERS} — les deux joueurs sont présents, récupération des profils
  *       (sortie refusée : le duel est engagé).</li>
  *   <li>{@link #FETCHING_QUESTIONS} — profils résolus, tirage des questions.</li>
- *   <li>{@link #CREATING_GAME} — questions prêtes, compte à rebours puis création de la partie.</li>
+ *   <li>{@link #CREATING_GAME} — questions prêtes, la partie est créée immédiatement.</li>
  *   <li>{@link #COMPLETED} — partie créée ({@code gameId} porté par l'événement terminal).</li>
  *   <li>{@link #CANCELLED} — salle annulée par l'initiateur.</li>
  *   <li>{@link #EXPIRED} — salle jamais lancée, expirée.</li>

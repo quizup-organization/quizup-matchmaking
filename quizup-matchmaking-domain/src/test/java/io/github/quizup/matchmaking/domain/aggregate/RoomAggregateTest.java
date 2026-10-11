@@ -141,8 +141,7 @@ class RoomAggregateTest {
                 .when(new RoomCommand.MarkRoomQuestionsLoadedCommand(ROOM_ID))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         RoomEvent.RoomQuestionsLoadedEvent.class,
-                        e -> ROOM_ID.equals(((RoomEvent.RoomQuestionsLoadedEvent) e).roomId())
-                                && ((RoomEvent.RoomQuestionsLoadedEvent) e).readyDeadlineAt() != null));
+                        e -> ROOM_ID.equals(((RoomEvent.RoomQuestionsLoadedEvent) e).roomId())));
     }
 
     @Test
@@ -281,7 +280,6 @@ class RoomAggregateTest {
     }
 
     private static RoomEvent.RoomQuestionsLoadedEvent questionsLoaded() {
-        return new RoomEvent.RoomQuestionsLoadedEvent(
-                ROOM_ID, Instant.now().plusSeconds(3), Instant.now());
+        return new RoomEvent.RoomQuestionsLoadedEvent(ROOM_ID, Instant.now());
     }
 }

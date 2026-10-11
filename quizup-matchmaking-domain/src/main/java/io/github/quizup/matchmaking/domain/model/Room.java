@@ -20,7 +20,6 @@ public record Room(
         RoomStatus status,
         boolean initiatorPresent,
         boolean participantPresent,
-        Instant readyDeadlineAt,
         Instant createdAt,
         Instant expiresAt,
         Instant updatedAt
