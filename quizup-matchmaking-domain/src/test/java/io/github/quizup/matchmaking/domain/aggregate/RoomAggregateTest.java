@@ -4,6 +4,7 @@ import io.github.quizup.axon.test.QuizUpAxonMatchers;
 import io.github.quizup.matchmaking.domain.command.RoomCommand;
 import io.github.quizup.matchmaking.domain.event.RoomEvent;
 import io.github.quizup.matchmaking.domain.exception.RoomExceptions;
+import io.github.quizup.microservice.core.domain.constant.QuizUpConstants;
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +14,8 @@ import java.time.Instant;
  * Test Axon in-memory de {@link RoomAggregate} (salle : deux humains ou humain/bot).
  * <p>
  * Le client émet une unique commande d'apparition ({@code JoinRoomCommand}) : présence et
- * enregistrement du second participant ; seul le bot est joint automatiquement par la saga.
+ * enregistrement du second participant ; le bot, lui, est présent dès la création de la salle
+ * (appliqué par l'agrégat, aucun join système).
  * Après l'apparition des deux joueurs, la préparation avance par commandes de phase et la
  * salle ne peut plus être quittée (l'annulation reste possible).
  */
@@ -51,13 +53,17 @@ class RoomAggregateTest {
     }
 
     @Test
-    void createBotRoom_carriesDifficultyAndBotFlag() {
+    void createBotRoom_carriesDifficultyAndBotFlag_andAppliesBotPresence() {
         fixture.givenNoPriorActivity()
-                .when(new RoomCommand.CreateRoomCommand(ROOM_ID, TOPIC, INITIATOR, OPPONENT, true, "HARD"))
-                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                .when(new RoomCommand.CreateRoomCommand(
+                        ROOM_ID, TOPIC, INITIATOR, QuizUpConstants.SYSTEM_USER_ID, true, "HARD"))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
                         RoomEvent.RoomCreatedEvent.class,
                         e -> ((RoomEvent.RoomCreatedEvent) e).vsBot()
-                                && "HARD".equals(((RoomEvent.RoomCreatedEvent) e).botDifficulty())));
+                                && "HARD".equals(((RoomEvent.RoomCreatedEvent) e).botDifficulty())))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                        RoomEvent.RoomEnteredEvent.class,
+                        e -> QuizUpConstants.SYSTEM_USER_ID.equals(((RoomEvent.RoomEnteredEvent) e).playerId())));
     }
 
     @Test
@@ -104,12 +110,14 @@ class RoomAggregateTest {
     }
 
     @Test
-    void botRoom_letsBotJoinAutomatically() {
-        fixture.given(createdBot())
-                .when(new RoomCommand.JoinRoomCommand(ROOM_ID, OPPONENT))
+    void botRoom_humanJoinCompletesPresence_andStartsPreparation() {
+        fixture.given(createdBot(), entered(QuizUpConstants.SYSTEM_USER_ID))
+                .when(new RoomCommand.JoinRoomCommand(ROOM_ID, INITIATOR))
                 .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
                         RoomEvent.RoomEnteredEvent.class,
-                        e -> OPPONENT.equals(((RoomEvent.RoomEnteredEvent) e).playerId())));
+                        e -> INITIATOR.equals(((RoomEvent.RoomEnteredEvent) e).playerId())))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                        RoomEvent.RoomAllPlayersPresentEvent.class, e -> true));
     }
 
     @Test
@@ -263,7 +271,7 @@ class RoomAggregateTest {
 
     private static RoomEvent.RoomCreatedEvent createdBot() {
         return new RoomEvent.RoomCreatedEvent(
-                ROOM_ID, TOPIC, INITIATOR, OPPONENT, true, "NORMAL",
+                ROOM_ID, TOPIC, INITIATOR, QuizUpConstants.SYSTEM_USER_ID, true, "NORMAL",
                 Instant.now().plusSeconds(3600), Instant.now());
     }
 

@@ -5,6 +5,7 @@ import io.github.quizup.matchmaking.domain.event.RoomEvent;
 import io.github.quizup.matchmaking.domain.exception.RoomExceptions;
 import io.github.quizup.matchmaking.domain.model.RoomDeadline;
 import io.github.quizup.matchmaking.domain.model.RoomStatus;
+import io.github.quizup.microservice.core.domain.constant.QuizUpConstants;
 import org.apache.commons.lang3.StringUtils;
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventsourcing.EventSourcingHandler;
@@ -50,7 +51,9 @@ public class RoomAggregate {
     /**
      * Ouvre une salle. Si {@code opponentId} est renseigné, c'est une salle nominative : seul cet
      * invité pourra apparaître comme second participant. {@code vsBot} marque le second joueur
-     * comme bot (join automatique par la saga).
+     * comme bot : sa présence est appliquée <b>dans la même unité de travail</b> que la création —
+     * aucune commande d'apparition supplémentaire par salle (le round-trip bloquant de la saga
+     * créait plusieurs minutes de lag sous charge, test 1000 parties).
      */
     @CommandHandler
     public RoomAggregate(RoomCommand.CreateRoomCommand command) {
@@ -69,6 +72,9 @@ public class RoomAggregate {
                 command.botDifficulty(),
                 now.plus(RoomDeadline.ROOM_EXPIRY_DURATION),
                 now));
+        if (command.vsBot()) {
+            apply(new RoomEvent.RoomEnteredEvent(command.roomId(), QuizUpConstants.SYSTEM_USER_ID, now));
+        }
     }
 
     /**

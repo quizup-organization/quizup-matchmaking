@@ -43,8 +43,8 @@ import java.util.UUID;
 /**
  * Orchestration de la salle temps réel — seul créateur de la partie (deux humains ou humain/bot).
  * <ul>
- *   <li>{@code RoomCreatedEvent} → expiration de la salle (1 jour) ; salle {@code vsBot} : join
- *       automatique du bot.</li>
+ *   <li>{@code RoomCreatedEvent} → expiration de la salle (1 jour). La présence du bot
+ *       ({@code vsBot}) est appliquée par l'agrégat à la création (aucun join système côté saga).</li>
  *   <li>{@code RoomEnteredEvent} → mémorise le participant (apparition client-driven).</li>
  *   <li>{@code RoomAllPlayersPresentEvent} → démarre la préparation : étape <b>profils</b>
  *       ({@link ProfileRepositoryPort}, bot exclu) puis étape <b>questions</b>
@@ -135,21 +135,6 @@ public class RoomSaga {
                 RoomDeadline.ROOM_EXPIRY);
         logger.info("Salle créée, expiration dans {}h: roomId={}, vsBot={}",
                 RoomDeadline.ROOM_EXPIRY_DURATION.toHours(), roomId, vsBot);
-        if (vsBot) {
-            joinBot();
-        }
-    }
-
-    /** Join automatique du bot : seule action système d'apparition (le client reste client-driven). */
-    private void joinBot() {
-        String botId = QuizUpConstants.SYSTEM_USER_ID;
-        try {
-            commandGateway.sendAndWait(new RoomCommand.JoinRoomCommand(roomId, botId));
-            logger.info("Bot entré dans la salle: roomId={}, botId={}", roomId, botId);
-        } catch (Exception exception) {
-            logger.error("Échec du join du bot: roomId={}", roomId, exception);
-            commandGateway.send(new RoomCommand.FailRoomCommand(roomId, "BOT_JOIN_FAILED"));
-        }
     }
 
     @SagaEventHandler(associationProperty = "roomId")

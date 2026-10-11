@@ -28,8 +28,9 @@ Trois responsabilités **distinctes**, chacune avec son agrégat :
 - **Salle** (`RoomAggregate`) : deux humains (salle partagée ou appariement) **ou** un humain
   contre le bot, **apparition client-driven**. Le client émet `JoinRoomCommand` (commande unique)
   quand l'utilisateur est réellement dans la salle : elle porte la présence et, pour le second
-  joueur, l'enregistrement du participant. Seule exception système : le join automatique du bot
-  sur une salle `vsBot` (émis par `RoomSaga`). `RoomSaga` est le **seul créateur de partie** : elle
+  joueur, l'enregistrement du participant. Seule exception système : le bot est présent **dès la
+  création** d'une salle `vsBot` (présence appliquée par l'agrégat, aucun join système). `RoomSaga`
+  est le **seul créateur de partie** : elle
   prépare la partie dès les deux joueurs présents (**vérification du thème n°2** : profils + tirage
   des questions) et la **crée immédiatement en fin de préparation** (aucun compte à rebours de
   lancement), avance le statut de préparation et, en cas d'échec, **annonce l'échec** aux
@@ -125,13 +126,13 @@ toutes les langues + mapping `theme.Question → DrawnQuestion` local ; la tradu
   `CreateRoomCommand` (salle nominative, opponentId = candidat) et `MarkMatchmakingMatchedCommand`
   des deux tickets.
 - Deadline atteinte sans adversaire → `CreateRoomCommand(vsBot=true, opponentId = SYSTEM_USER_ID)`
-  (le join du bot est exécuté par `RoomSaga`) + `MarkMatchmakingMatchedCommand(vsBot=true)`.
+  (le bot est déjà présent dans la salle créée) + `MarkMatchmakingMatchedCommand(vsBot=true)`.
 - Échec de création de salle → `FailMatchmakingCommand` (les deux tickets, `ROOM_CREATION_FAILED`).
 
 ### Salle (`RoomSaga`)
 
-- `RoomCreatedEvent` → expiration planifiée (**1 jour**) ; si `vsBot`, **join automatique du bot**
-  (`JoinRoomCommand`, échec → `FailRoomCommand("BOT_JOIN_FAILED")`).
+- `RoomCreatedEvent` → expiration planifiée (**1 jour**). La présence du bot (`vsBot`) est portée
+  par l'agrégat (événement d'apparition appliqué à la création) : aucun join système côté saga.
 - `RoomEnteredEvent` (apparition client) → mémorise le participant (non-initiateur).
 - `RoomAllPlayersPresentEvent` → démarre la **préparation** : étape profils puis étape questions
   (vérification du sujet n°2) ; chaque étape avance le statut de la salle. Questions
