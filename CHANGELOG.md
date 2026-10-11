@@ -1,3 +1,9 @@
+## [9.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v9.0.1...v9.1.0) (2026-10-11)
+
+### Features
+
+* **matchmaking:** préparation événementielle et accusé GAME_CREATED (sagas sans sendAndWait) ([808f66d](https://github.com/quizup-organization/quizup-matchmaking/commit/808f66dd0452d301209f71623cc073e7222fe18b))
+
 ## [9.0.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v9.0.0...v9.0.1) (2026-10-11)
 
 ### Performance Improvements
