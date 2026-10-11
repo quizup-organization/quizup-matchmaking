@@ -1,3 +1,9 @@
+## [9.0.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v9.0.0...v9.0.1) (2026-10-11)
+
+### Performance Improvements
+
+* **matchmaking:** présence du bot appliquée à la création (suppression du join système bloquant) ([875fd3e](https://github.com/quizup-organization/quizup-matchmaking/commit/875fd3e8d82bad8c7f5a29cbbf50c8b064e604f9))
+
 ## [9.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v8.0.0...v9.0.0) (2026-10-11)
 
 ### ⚠ BREAKING CHANGES
