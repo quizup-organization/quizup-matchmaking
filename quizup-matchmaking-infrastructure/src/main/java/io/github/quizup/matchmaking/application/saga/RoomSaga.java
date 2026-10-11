@@ -1,23 +1,15 @@
 package io.github.quizup.matchmaking.application.saga;
 
-import io.github.quizup.game.domain.command.GameCommand;
-import io.github.quizup.game.domain.model.BotDifficulty;
-import io.github.quizup.game.domain.model.GamePlayerType;
-import io.github.quizup.game.domain.model.GameQuestion;
-import io.github.quizup.game.domain.model.GameQuestionChoice;
-import io.github.quizup.game.domain.model.GameQuestionContent;
+import io.github.quizup.game.domain.event.GameEvent;
 import io.github.quizup.game.domain.model.GameRules;
-import io.github.quizup.game.domain.model.PlayerProgressSnapshot;
+import io.github.quizup.matchmaking.application.service.GamePreparationService;
 import io.github.quizup.matchmaking.domain.command.RoomCommand;
 import io.github.quizup.matchmaking.domain.event.RoomEvent;
 import io.github.quizup.matchmaking.domain.model.DrawnQuestion;
-import io.github.quizup.matchmaking.domain.model.DrawnQuestionChoice;
-import io.github.quizup.matchmaking.domain.model.DrawnQuestionContent;
 import io.github.quizup.matchmaking.domain.model.RoomDeadline;
 import io.github.quizup.matchmaking.domain.model.RoomPlayer;
 import io.github.quizup.matchmaking.domain.port.out.ProfileRepositoryPort;
 import io.github.quizup.matchmaking.domain.port.out.QuestionDrawPort;
-import io.github.quizup.microservice.core.domain.constant.QuizUpConstants;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import lombok.Getter;
 import lombok.Setter;
@@ -25,18 +17,18 @@ import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.deadline.DeadlineManager;
 import org.axonframework.deadline.annotation.DeadlineHandler;
+import org.axonframework.messaging.interceptors.ExceptionHandler;
 import org.axonframework.modelling.saga.EndSaga;
 import org.axonframework.modelling.saga.SagaEventHandler;
+import org.axonframework.modelling.saga.SagaLifecycle;
 import org.axonframework.modelling.saga.StartSaga;
 import org.axonframework.spring.stereotype.Saga;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -46,14 +38,15 @@ import java.util.UUID;
  *   <li>{@code RoomCreatedEvent} → expiration de la salle (1 jour). La présence du bot
  *       ({@code vsBot}) est appliquée par l'agrégat à la création (aucun join système côté saga).</li>
  *   <li>{@code RoomEnteredEvent} → mémorise le participant (apparition client-driven).</li>
- *   <li>{@code RoomAllPlayersPresentEvent} → démarre la préparation : étape <b>profils</b>
- *       ({@link ProfileRepositoryPort}, bot exclu) puis étape <b>questions</b>
+ *   <li>{@code RoomAllPlayersPresentEvent} → étape <b>profils</b> ({@link ProfileRepositoryPort},
+ *       bot exclu) ; {@code RoomPlayersLoadedEvent} → étape <b>questions</b>
  *       ({@link QuestionDrawPort}, vérification du sujet n°2) ; chaque étape avance le statut de
  *       la salle. Questions insuffisantes → échec immédiat de la salle.</li>
- *   <li>{@code RoomQuestionsLoadedEvent} → fin de préparation : création immédiate de la partie
- *       (plus de compte à rebours de lancement).</li>
- *   <li>Création de la partie (questions fournies dans la commande)
- *       puis clôture de la salle ; échec → {@code RoomFailedEvent} annoncé aux joueurs présents.</li>
+ *   <li>{@code RoomQuestionsLoadedEvent} → envoi de {@code CreateGameCommand} (assemblé par
+ *       {@link GamePreparationService}) en <b>fire-and-forget</b>, association sur {@code gameId}
+ *       et deadline d'accusé ; {@code GameCreatedEvent} → {@code MarkRoomGameCreatedCommand} puis
+ *       {@code RoomGameCreatedEvent} → {@code CompleteRoomCommand}. Accusé absent ou échec
+ *       synchrone → {@code RoomFailedEvent} annoncé aux joueurs présents.</li>
  *   <li>{@code RoomLeftEvent} (sortie non destructive avant engagement) → retour possible. La
  *       sortie est refusée par l'agrégat une fois la préparation
  *       engagée.</li>
@@ -77,6 +70,9 @@ public class RoomSaga {
 
     @Autowired
     private transient QuestionDrawPort questionDrawPort;
+
+    @Autowired
+    private transient GamePreparationService gamePreparationService;
 
     @Getter
     @Setter
@@ -109,6 +105,14 @@ public class RoomSaga {
     @Getter
     @Setter
     private String purgeDeadlineId;
+
+    @Getter
+    @Setter
+    private String gameId;
+
+    @Getter
+    @Setter
+    private String gameCreationDeadlineId;
 
     @Getter
     @Setter
@@ -147,21 +151,27 @@ public class RoomSaga {
     }
 
     /**
-     * Les deux joueurs sont présents : lance la préparation (profils puis questions). La partie
-     * sera créée dès la fin de la préparation ({@link RoomEvent.RoomQuestionsLoadedEvent}).
+     * Les deux joueurs sont présents : étape 1, résolution des profils. L'étape 2 (questions)
+     * est déclenchée par {@link RoomEvent.RoomPlayersLoadedEvent} — un pas par événement.
      */
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomAllPlayersPresentEvent event) {
-        logger.info("Les deux joueurs sont présents, préparation de la partie: roomId={}", roomId);
+        logger.info("Les deux joueurs sont présents, résolution des profils: roomId={}", roomId);
         loadPlayers();
+    }
+
+    /** Profils résolus : étape 2, tirage des questions (vérification du sujet n°2). */
+    @SagaEventHandler(associationProperty = "roomId")
+    public void on(RoomEvent.RoomPlayersLoadedEvent event) {
+        logger.info("Profils chargés, tirage des questions: roomId={}", roomId);
         loadQuestions();
     }
 
-    /** Fin de préparation (questions tirées) : la partie est créée immédiatement. */
+    /** Fin de préparation (questions tirées) : la création de la partie est demandée (send). */
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomQuestionsLoadedEvent event) {
         logger.info("Préparation terminée, création de la partie: roomId={}", roomId);
-        createGameAndComplete();
+        requestGameCreation();
     }
 
     /** Étape profils : le bot n'a pas de profil à résoudre. */
@@ -207,48 +217,58 @@ public class RoomSaga {
     }
 
     /**
-     * Fin de préparation : la partie est créée seulement si la préparation a abouti (sinon
-     * l'échec a déjà été annoncé et la salle est terminale).
+     * Demande de création : {@code CreateGameCommand} fire-and-forget (assemblée par
+     * {@link GamePreparationService}), association sur {@code gameId} pour recevoir l'accusé du
+     * service game, et deadline de sécurité. Idempotent (relecture at-least-once).
      */
-    private void createGameAndComplete() {
-        if (!playersLoaded() || drawnQuestions == null || drawnQuestions.size() < GameRules.TOTAL_ROUNDS) {
+    private void requestGameCreation() {
+        if (gameId != null
+                || !playersLoaded()
+                || drawnQuestions == null
+                || drawnQuestions.size() < GameRules.TOTAL_ROUNDS) {
             return;
         }
-
-        BotDifficulty difficulty = vsBot ? parseBotDifficulty(botDifficulty) : null;
-        String gameId = UUID.randomUUID().toString();
-        try {
-            commandGateway.sendAndWait(new GameCommand.CreateGameCommand(
-                    gameId,
-                    topicId,
-                    initiatorProfile.playerId(),
-                    initiatorProfile.playerName(),
-                    vsBot ? QuizUpConstants.SYSTEM_USER_ID : participantProfile.playerId(),
-                    vsBot ? QuizUpConstants.SYSTEM_USER_NAME : participantProfile.playerName(),
-                    vsBot ? GamePlayerType.BOT : GamePlayerType.HUMAN,
-                    difficulty,
-                    new PlayerProgressSnapshot(initiatorProfile.level(), initiatorProfile.xpTotal()),
-                    vsBot
-                            ? PlayerProgressSnapshot.forBot(difficulty)
-                            : new PlayerProgressSnapshot(participantProfile.level(), participantProfile.xpTotal()),
-                    toGameQuestions(drawnQuestions)));
-            commandGateway.send(new RoomCommand.CompleteRoomCommand(roomId, gameId));
-            logger.info("Partie créée depuis la salle: roomId={}, gameId={}, vsBot={}", roomId, gameId, vsBot);
-        } catch (Exception exception) {
-            logger.error("Échec de création de partie depuis la salle: roomId={}", roomId, exception);
-            commandGateway.send(new RoomCommand.FailRoomCommand(roomId, "GAME_CREATION_FAILED"));
-        }
+        this.gameId = UUID.randomUUID().toString();
+        SagaLifecycle.associateWith("gameId", gameId);
+        this.gameCreationDeadlineId = deadlineManager.schedule(
+                RoomDeadline.ROOM_GAME_CREATION_DURATION,
+                RoomDeadline.ROOM_GAME_CREATION);
+        logger.info("Création de partie demandée: roomId={}, gameId={}, vsBot={}", roomId, gameId, vsBot);
+        commandGateway.send(gamePreparationService.createGameCommand(
+                gameId, topicId, initiatorProfile, participantProfile, vsBot, botDifficulty, drawnQuestions));
     }
 
-    private static BotDifficulty parseBotDifficulty(String difficulty) {
-        if (difficulty == null || difficulty.isBlank()) {
-            return BotDifficulty.NORMAL;
-        }
-        try {
-            return BotDifficulty.valueOf(difficulty);
-        } catch (IllegalArgumentException exception) {
-            return BotDifficulty.NORMAL;
-        }
+    /** Accusé du service game : la partie existe, la salle peut être clôturée. */
+    @SagaEventHandler(associationProperty = "gameId")
+    public void on(GameEvent.GameCreatedEvent event) {
+        cancelGameCreationDeadline();
+        logger.info("Partie créée: roomId={}, gameId={}", roomId, event.gameId());
+        commandGateway.send(new RoomCommand.MarkRoomGameCreatedCommand(roomId, event.gameId()));
+    }
+
+    /** La salle a accusé la création : clôture. */
+    @SagaEventHandler(associationProperty = "roomId")
+    public void on(RoomEvent.RoomGameCreatedEvent event) {
+        logger.info("Accusé de création en salle, clôture: roomId={}, gameId={}", roomId, event.gameId());
+        commandGateway.send(new RoomCommand.CompleteRoomCommand(roomId, event.gameId()));
+    }
+
+    /** Accusé de création absent (échec/routage perdu) : la salle échoue au lieu de rester bloquée. */
+    @DeadlineHandler(deadlineName = RoomDeadline.ROOM_GAME_CREATION)
+    public void onGameCreationTimeout() {
+        logger.warn("Accusé de création de partie absent: roomId={}, gameId={}", roomId, gameId);
+        commandGateway.send(new RoomCommand.FailRoomCommand(roomId, "GAME_CREATION_TIMEOUT"));
+    }
+
+    /**
+     * Échec synchrone d'un handler de la saga (profils, tirage, mapping) : la salle échoue au lieu
+     * de bloquer le processor. Les échecs asynchrones des commandes {@code send} ne passent pas ici
+     * (créations d'agrégats pures ; accusé manquant couvert par la deadline).
+     */
+    @ExceptionHandler
+    public void on(Exception exception) {
+        logger.error("Échec de préparation de la salle: roomId={}", roomId, exception);
+        commandGateway.send(new RoomCommand.FailRoomCommand(roomId, "ROOM_PREPARATION_FAILED"));
     }
 
     @DeadlineHandler(deadlineName = RoomDeadline.ROOM_EXPIRY)
@@ -259,21 +279,25 @@ public class RoomSaga {
 
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomCancelledEvent event) {
+        cancelGameCreationDeadline();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomExpiredEvent event) {
+        cancelGameCreationDeadline();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomFailedEvent event) {
+        cancelGameCreationDeadline();
         schedulePurge();
     }
 
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomCompletedEvent event) {
+        cancelGameCreationDeadline();
         schedulePurge();
     }
 
@@ -299,6 +323,7 @@ public class RoomSaga {
 
     private void cancelAllDeadlines() {
         cancelExpiryDeadline();
+        cancelGameCreationDeadline();
         if (purgeDeadlineId != null) {
             deadlineManager.cancelSchedule(RoomDeadline.ROOM_PURGE, purgeDeadlineId);
             purgeDeadlineId = null;
@@ -312,6 +337,13 @@ public class RoomSaga {
         }
     }
 
+    private void cancelGameCreationDeadline() {
+        if (gameCreationDeadlineId != null) {
+            deadlineManager.cancelSchedule(RoomDeadline.ROOM_GAME_CREATION, gameCreationDeadlineId);
+            gameCreationDeadlineId = null;
+        }
+    }
+
     private static Set<Language> languagesOf(RoomPlayer... players) {
         Set<Language> languages = new HashSet<>();
         for (RoomPlayer player : players) {
@@ -320,39 +352,5 @@ public class RoomSaga {
             }
         }
         return languages;
-    }
-
-    // ── Mapping du modèle local vers le domaine game (l'émetteur de la commande mappe lui-même :
-    // ── un *-domain ne dépend jamais d'un autre service, cf. command-preparation.md) ──
-
-    private static List<GameQuestion> toGameQuestions(List<DrawnQuestion> questions) {
-        return questions.stream().map(RoomSaga::toGameQuestion).toList();
-    }
-
-    private static GameQuestion toGameQuestion(DrawnQuestion question) {
-        Map<Language, GameQuestionContent> translations = new EnumMap<>(Language.class);
-        question.translations().forEach((language, content) ->
-                translations.put(language, toGameQuestionContent(content)));
-        return new GameQuestion(
-                question.questionId(),
-                translations,
-                question.imageUrl(),
-                question.difficulty(),
-                toGameQuestionChoice(question.correctAnswer()));
-    }
-
-    private static GameQuestionContent toGameQuestionContent(DrawnQuestionContent content) {
-        Map<GameQuestionChoice, String> answers = new EnumMap<>(GameQuestionChoice.class);
-        content.answers().forEach((choice, text) -> {
-            GameQuestionChoice mapped = toGameQuestionChoice(choice);
-            if (mapped != null) {
-                answers.put(mapped, text);
-            }
-        });
-        return new GameQuestionContent(content.text(), answers);
-    }
-
-    private static GameQuestionChoice toGameQuestionChoice(DrawnQuestionChoice choice) {
-        return choice == null ? null : GameQuestionChoice.valueOf(choice.name());
     }
 }

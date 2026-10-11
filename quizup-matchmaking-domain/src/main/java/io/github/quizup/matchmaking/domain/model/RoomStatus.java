@@ -9,6 +9,8 @@ package io.github.quizup.matchmaking.domain.model;
  *       (sortie refusée : le duel est engagé).</li>
  *   <li>{@link #FETCHING_QUESTIONS} — profils résolus, tirage des questions.</li>
  *   <li>{@link #CREATING_GAME} — questions prêtes, la partie est créée immédiatement.</li>
+ *   <li>{@link #GAME_CREATED} — la partie est créée (accusé du service game) ; la salle peut
+ *       être clôturée.</li>
  *   <li>{@link #COMPLETED} — partie créée ({@code gameId} porté par l'événement terminal).</li>
  *   <li>{@link #CANCELLED} — salle annulée par l'initiateur.</li>
  *   <li>{@link #EXPIRED} — salle jamais lancée, expirée.</li>
@@ -23,6 +25,7 @@ public enum RoomStatus {
     FETCHING_PLAYERS,
     FETCHING_QUESTIONS,
     CREATING_GAME,
+    GAME_CREATED,
     COMPLETED,
     CANCELLED,
     EXPIRED,

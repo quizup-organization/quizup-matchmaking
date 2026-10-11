@@ -157,21 +157,33 @@ public class RoomAggregate {
         apply(new RoomEvent.RoomPlayersLoadedEvent(roomId, Instant.now()));
     }
 
-    /** Commande interne (saga) : les questions sont tirées ; la partie est créée immédiatement. */
+    /** Commande interne (saga) : les questions sont tirées ; la saga lance la création de la partie. */
     @CommandHandler
     public void handle(RoomCommand.MarkRoomQuestionsLoadedCommand command) {
         if (status != RoomStatus.FETCHING_QUESTIONS) {
             return;
         }
-        logger.info("Questions loaded in room: roomId={}, création de la partie immédiate", roomId);
+        logger.info("Questions loaded in room: roomId={}, création de la partie", roomId);
         apply(new RoomEvent.RoomQuestionsLoadedEvent(roomId, Instant.now()));
     }
 
-    /** Succès : la partie est créée ; la salle reste lisible jusqu'à sa purge par la saga. */
+    /** Commande interne (saga) : le service game a accusé la création de la partie. */
+    @CommandHandler
+    public void handle(RoomCommand.MarkRoomGameCreatedCommand command) {
+        if (status != RoomStatus.CREATING_GAME) {
+            return;
+        }
+        requireGameId(command.gameId(), roomId);
+        logger.info("Game created in room: roomId={}, gameId={}", roomId, command.gameId());
+        apply(new RoomEvent.RoomGameCreatedEvent(roomId, command.gameId(), Instant.now()));
+    }
+
+    /** Succès : la partie a été créée et accusée ; la salle reste lisible jusqu'à sa purge. */
     @CommandHandler
     public void handle(RoomCommand.CompleteRoomCommand command) {
         requireGameId(command.gameId(), roomId);
-        if (isClosed()) {
+        // Clôture uniquement après l'accusé de création (GAME_CREATED) ; idempotent si déjà close.
+        if (status != RoomStatus.GAME_CREATED) {
             return;
         }
         // La partie n'est créée qu'une fois les deux joueurs réellement présents en salle.
@@ -287,6 +299,11 @@ public class RoomAggregate {
     @EventSourcingHandler
     public void on(RoomEvent.RoomQuestionsLoadedEvent event) {
         this.status = RoomStatus.CREATING_GAME;
+    }
+
+    @EventSourcingHandler
+    public void on(RoomEvent.RoomGameCreatedEvent event) {
+        this.status = RoomStatus.GAME_CREATED;
     }
 
     @EventSourcingHandler

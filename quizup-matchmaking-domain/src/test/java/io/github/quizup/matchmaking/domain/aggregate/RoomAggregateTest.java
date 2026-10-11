@@ -17,7 +17,8 @@ import java.time.Instant;
  * enregistrement du second participant ; le bot, lui, est présent dès la création de la salle
  * (appliqué par l'agrégat, aucun join système).
  * Après l'apparition des deux joueurs, la préparation avance par commandes de phase et la
- * salle ne peut plus être quittée (l'annulation reste possible).
+ * salle ne peut plus être quittée (l'annulation reste possible). La clôture exige l'accusé de
+ * création de la partie ({@code GAME_CREATED}).
  */
 class RoomAggregateTest {
 
@@ -200,9 +201,26 @@ class RoomAggregateTest {
     }
 
     @Test
-    void complete_closesRoomWithoutImmediatePurge() {
+    void gameCreated_advancesPreparation() {
         fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent(), playersLoaded(),
                         questionsLoaded())
+                .when(new RoomCommand.MarkRoomGameCreatedCommand(ROOM_ID, "game-1"))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        RoomEvent.RoomGameCreatedEvent.class,
+                        e -> "game-1".equals(((RoomEvent.RoomGameCreatedEvent) e).gameId())));
+    }
+
+    @Test
+    void gameCreated_ignoredBeforeQuestionsLoaded() {
+        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent(), playersLoaded())
+                .when(new RoomCommand.MarkRoomGameCreatedCommand(ROOM_ID, "game-1"))
+                .expectNoEvents();
+    }
+
+    @Test
+    void complete_closesRoomWithoutImmediatePurge() {
+        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent(), playersLoaded(),
+                        questionsLoaded(), gameCreated())
                 .when(new RoomCommand.CompleteRoomCommand(ROOM_ID, "game-1"))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         RoomEvent.RoomCompletedEvent.class,
@@ -210,8 +228,16 @@ class RoomAggregateTest {
     }
 
     @Test
+    void complete_ignoredWithoutGameCreatedAck() {
+        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent(), playersLoaded(),
+                        questionsLoaded())
+                .when(new RoomCommand.CompleteRoomCommand(ROOM_ID, "game-1"))
+                .expectNoEvents();
+    }
+
+    @Test
     void complete_refusedWhenBothPlayersNotPresent() {
-        fixture.given(created(), entered(INITIATOR))
+        fixture.given(created(), gameCreated())
                 .when(new RoomCommand.CompleteRoomCommand(ROOM_ID, "game-1"))
                 .expectException(RoomExceptions.ParticipantNotPresentProblem.class);
     }
@@ -289,5 +315,9 @@ class RoomAggregateTest {
 
     private static RoomEvent.RoomQuestionsLoadedEvent questionsLoaded() {
         return new RoomEvent.RoomQuestionsLoadedEvent(ROOM_ID, Instant.now());
+    }
+
+    private static RoomEvent.RoomGameCreatedEvent gameCreated() {
+        return new RoomEvent.RoomGameCreatedEvent(ROOM_ID, "game-1", Instant.now());
     }
 }

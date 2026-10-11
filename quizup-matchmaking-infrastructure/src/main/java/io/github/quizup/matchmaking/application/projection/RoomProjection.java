@@ -77,13 +77,24 @@ public class RoomProjection {
                 .build());
     }
 
-    /** Fin de préparation : la partie est créée immédiatement (statut de lancement). */
+    /** Fin de préparation : la saga lance la création de la partie. */
     @EventHandler
     @Transactional
     public void on(RoomEvent.RoomQuestionsLoadedEvent event) {
         update(event.roomId(), room -> room.toBuilder()
                 .status(RoomStatus.CREATING_GAME)
                 .updatedAt(event.loadedAt())
+                .build());
+    }
+
+    /** Le service game a accusé la création : le {@code gameId} est exposé avant la clôture. */
+    @EventHandler
+    @Transactional
+    public void on(RoomEvent.RoomGameCreatedEvent event) {
+        update(event.roomId(), room -> room.toBuilder()
+                .status(RoomStatus.GAME_CREATED)
+                .gameId(event.gameId())
+                .updatedAt(event.gameCreatedAt())
                 .build());
     }
 

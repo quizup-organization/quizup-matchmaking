@@ -51,12 +51,23 @@ public interface RoomEvent {
     }
 
     /**
-     * Les questions sont tirées : la préparation passe en {@code CREATING_GAME} et la partie est
-     * créée immédiatement (plus de compte à rebours de lancement).
+     * Les questions sont tirées : la préparation passe en {@code CREATING_GAME} ; la saga lance
+     * la création de la partie (fire-and-forget) et attend l'accusé {@link RoomGameCreatedEvent}.
      */
     record RoomQuestionsLoadedEvent(
             String roomId,
             Instant loadedAt
+    ) implements RoomEvent {
+    }
+
+    /**
+     * La partie a été créée par le service game (accusé de {@code CreateGameCommand}) : la salle
+     * passe en {@code GAME_CREATED} et peut être clôturée.
+     */
+    record RoomGameCreatedEvent(
+            String roomId,
+            String gameId,
+            Instant gameCreatedAt
     ) implements RoomEvent {
     }
 

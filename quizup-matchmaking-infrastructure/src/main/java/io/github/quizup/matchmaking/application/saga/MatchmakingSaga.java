@@ -16,6 +16,7 @@ import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.deadline.DeadlineManager;
 import org.axonframework.deadline.annotation.DeadlineHandler;
+import org.axonframework.messaging.interceptors.ExceptionHandler;
 import org.axonframework.modelling.saga.EndSaga;
 import org.axonframework.modelling.saga.SagaEventHandler;
 import org.axonframework.modelling.saga.StartSaga;
@@ -35,9 +36,11 @@ import java.util.UUID;
  * <p>
  * Le dernier arrivé initie le pairage : il cherche un candidat plus ancien, compatible (même
  * sujet, niveau ±{@code LEVEL_WINDOW}, langues couvertes par le sujet) puis crée la <b>salle</b>
- * et marque les deux recherches comme appariées. À l'échéance (5 s) sans adversaire, il crée une
- * salle contre le bot (dont le join est exécuté par la saga salle). Le matchmaking ne prépare
- * jamais la partie : la salle est l'unique point d'entrée de préparation.
+ * (fire-and-forget, comme le défi nominatif) et marque les deux recherches comme appariées. À
+ * l'échéance (5 s) sans adversaire, il crée une salle contre le bot. Le matchmaking ne prépare
+ * jamais la partie : la salle est l'unique point d'échec, annoncé aux joueurs présents par
+ * {@code RoomSaga}. Les exceptions des ports (pool, couverture du sujet) font échouer les tickets
+ * via {@link ExceptionHandler}.
  */
 @Saga
 @ProcessingGroup("matchmaking-saga")
@@ -129,21 +132,14 @@ public class MatchmakingSaga {
 
     private void createHumanRoom(MatchmakingCandidate candidate) {
         String roomId = UUID.randomUUID().toString();
-        try {
-            commandGateway.sendAndWait(new RoomCommand.CreateRoomCommand(
-                    roomId, topicId, playerId, candidate.playerId(), false, null));
-            commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
-                    matchmakingId, candidate.playerId(), roomId, false));
-            commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
-                    candidate.matchmakingId(), playerId, roomId, false));
-            this.finished = true;
-        } catch (Exception exception) {
-            logger.error("Échec de création de la salle pour l'appariement {} / {}",
-                    matchmakingId, candidate.matchmakingId(), exception);
-            commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(matchmakingId, "ROOM_CREATION_FAILED"));
-            commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(candidate.matchmakingId(), "ROOM_CREATION_FAILED"));
-            this.finished = true;
-        }
+        // Fire-and-forget : la salle est l'unique point d'échec (RoomFailedEvent).
+        commandGateway.send(new RoomCommand.CreateRoomCommand(
+                roomId, topicId, playerId, candidate.playerId(), false, null));
+        commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
+                matchmakingId, candidate.playerId(), roomId, false));
+        commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
+                candidate.matchmakingId(), playerId, roomId, false));
+        this.finished = true;
     }
 
     @DeadlineHandler(deadlineName = MatchmakingDeadline.MATCHMAKING_DEADLINE)
@@ -153,17 +149,22 @@ public class MatchmakingSaga {
         }
         logger.info("Timeout matchmaking — salle bot: matchmakingId={}", matchmakingId);
         String roomId = UUID.randomUUID().toString();
-        try {
-            commandGateway.sendAndWait(new RoomCommand.CreateRoomCommand(
-                    roomId, topicId, playerId, QuizUpConstants.SYSTEM_USER_ID, true, null));
-            commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
-                    matchmakingId, null, roomId, true));
-            this.finished = true;
-        } catch (Exception exception) {
-            logger.error("Échec de création de la salle bot: matchmakingId={}", matchmakingId, exception);
-            commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(matchmakingId, "ROOM_CREATION_FAILED"));
-            this.finished = true;
-        }
+        commandGateway.send(new RoomCommand.CreateRoomCommand(
+                roomId, topicId, playerId, QuizUpConstants.SYSTEM_USER_ID, true, null));
+        commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
+                matchmakingId, null, roomId, true));
+        this.finished = true;
+    }
+
+    /**
+     * Échec synchrone d'un handler de la saga (pool, vérification de couverture du sujet) :
+     * le ticket passe en {@code FAILED} au lieu de bloquer le processor. Les échecs asynchrones
+     * des commandes {@code send} ne passent pas ici — les créations d'agrégats sont pures.
+     */
+    @ExceptionHandler
+    public void on(Exception exception) {
+        logger.error("Échec de l'appariement: matchmakingId={}", matchmakingId, exception);
+        commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(matchmakingId, "MATCHMAKING_ERROR"));
     }
 
     @SagaEventHandler(associationProperty = "matchmakingId")

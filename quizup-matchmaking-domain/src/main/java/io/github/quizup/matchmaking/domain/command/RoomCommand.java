@@ -69,6 +69,16 @@ public interface RoomCommand {
     ) implements RoomCommand {
     }
 
+    /**
+     * Commande interne (saga) : le service game a accusé la création de la partie
+     * ({@code GameCreatedEvent}). La salle peut être clôturée par {@link CompleteRoomCommand}.
+     */
+    record MarkRoomGameCreatedCommand(
+            @TargetAggregateIdentifier String roomId,
+            String gameId
+    ) implements RoomCommand {
+    }
+
     /** Commande interne (saga) : la partie a été créée ; la salle reste lisible jusqu'à sa purge. */
     record CompleteRoomCommand(
             @TargetAggregateIdentifier String roomId,

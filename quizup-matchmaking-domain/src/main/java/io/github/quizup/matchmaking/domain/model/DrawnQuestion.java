@@ -7,7 +7,7 @@ import java.util.Map;
 /**
  * Question tirée pour la préparation d'une partie (miroir local de {@code game.GameQuestion} :
  * un {@code *-domain} ne dépend jamais d'un autre service). Le mapping vers le modèle du
- * domaine game est fait par l'émetteur de la commande (saga salle), cf. {@code command-preparation.md}.
+ * domaine game est fait par l'application émettrice ({@code GamePreparationService}).
  */
 public record DrawnQuestion(
         String questionId,

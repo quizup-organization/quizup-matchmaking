@@ -13,6 +13,15 @@ public interface RoomDeadline {
 
     Duration ROOM_EXPIRY_DURATION = Duration.ofDays(1);
 
+    /**
+     * Accusé de création de la partie ({@code GameCreatedEvent}) attendu par la saga : la
+     * commande est fire-and-forget, donc un accusé manquant (échec/routage perdu) fait échouer
+     * la salle au lieu de la laisser bloquée en {@code CREATING_GAME}.
+     */
+    String ROOM_GAME_CREATION = "room-game-creation";
+
+    Duration ROOM_GAME_CREATION_DURATION = Duration.ofSeconds(30);
+
     /** Rétention d'un état terminal (annulé/expiré/échoué) avant purge : le client lit l'état. */
     String ROOM_PURGE = "room-purge";
 

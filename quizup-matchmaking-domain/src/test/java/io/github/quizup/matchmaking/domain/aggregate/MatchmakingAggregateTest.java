@@ -65,7 +65,7 @@ class MatchmakingAggregateTest {
     @Test
     void fail_appliesFailedEvent() {
         fixture.given(started())
-                .when(new MatchmakingCommand.FailMatchmakingCommand(MM_ID, "ROOM_CREATION_FAILED"))
+                .when(new MatchmakingCommand.FailMatchmakingCommand(MM_ID, "MATCHMAKING_ERROR"))
                 .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
                         MatchmakingEvent.MatchmakingFailedEvent.class,
                         e -> ((MatchmakingEvent.MatchmakingFailedEvent) e).matchmakingId().equals(MM_ID)));
