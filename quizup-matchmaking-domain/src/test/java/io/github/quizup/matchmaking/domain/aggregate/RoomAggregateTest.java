@@ -145,8 +145,25 @@ class RoomAggregateTest {
     }
 
     @Test
-    void questionsLoaded_advancesPreparation() {
+    void playedQuestions_advancesPreparation() {
         fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent(), playersLoaded())
+                .when(new RoomCommand.MarkRoomPlayedQuestionsLoadedCommand(ROOM_ID))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        RoomEvent.RoomPlayedQuestionsLoadedEvent.class,
+                        e -> ROOM_ID.equals(((RoomEvent.RoomPlayedQuestionsLoadedEvent) e).roomId())));
+    }
+
+    @Test
+    void playedQuestions_ignoredBeforePlayersLoaded() {
+        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent())
+                .when(new RoomCommand.MarkRoomPlayedQuestionsLoadedCommand(ROOM_ID))
+                .expectNoEvents();
+    }
+
+    @Test
+    void questionsLoaded_advancesPreparation() {
+        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent(), playersLoaded(),
+                        playedQuestionsLoaded())
                 .when(new RoomCommand.MarkRoomQuestionsLoadedCommand(ROOM_ID))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         RoomEvent.RoomQuestionsLoadedEvent.class,
@@ -203,7 +220,7 @@ class RoomAggregateTest {
     @Test
     void gameCreated_advancesPreparation() {
         fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent(), playersLoaded(),
-                        questionsLoaded())
+                        playedQuestionsLoaded(), questionsLoaded())
                 .when(new RoomCommand.MarkRoomGameCreatedCommand(ROOM_ID, "game-1"))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         RoomEvent.RoomGameCreatedEvent.class,
@@ -220,7 +237,7 @@ class RoomAggregateTest {
     @Test
     void complete_closesRoomWithoutImmediatePurge() {
         fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent(), playersLoaded(),
-                        questionsLoaded(), gameCreated())
+                        playedQuestionsLoaded(), questionsLoaded(), gameCreated())
                 .when(new RoomCommand.CompleteRoomCommand(ROOM_ID, "game-1"))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         RoomEvent.RoomCompletedEvent.class,
@@ -230,7 +247,7 @@ class RoomAggregateTest {
     @Test
     void complete_ignoredWithoutGameCreatedAck() {
         fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent(), playersLoaded(),
-                        questionsLoaded())
+                        playedQuestionsLoaded(), questionsLoaded())
                 .when(new RoomCommand.CompleteRoomCommand(ROOM_ID, "game-1"))
                 .expectNoEvents();
     }
@@ -311,6 +328,10 @@ class RoomAggregateTest {
 
     private static RoomEvent.RoomPlayersLoadedEvent playersLoaded() {
         return new RoomEvent.RoomPlayersLoadedEvent(ROOM_ID, Instant.now());
+    }
+
+    private static RoomEvent.RoomPlayedQuestionsLoadedEvent playedQuestionsLoaded() {
+        return new RoomEvent.RoomPlayedQuestionsLoadedEvent(ROOM_ID, Instant.now());
     }
 
     private static RoomEvent.RoomQuestionsLoadedEvent questionsLoaded() {

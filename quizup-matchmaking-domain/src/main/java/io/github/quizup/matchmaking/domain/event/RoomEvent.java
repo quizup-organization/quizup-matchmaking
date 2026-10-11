@@ -42,9 +42,20 @@ public interface RoomEvent {
     }
 
     /**
-     * Les profils des joueurs sont résolus : la préparation passe en {@code FETCHING_QUESTIONS}.
+     * Les profils des joueurs sont résolus : la préparation passe en
+     * {@code FETCHING_PLAYED_QUESTIONS} (résolution de l'historique des questions jouées).
      */
     record RoomPlayersLoadedEvent(
+            String roomId,
+            Instant loadedAt
+    ) implements RoomEvent {
+    }
+
+    /**
+     * Les questions déjà jouées par les joueurs sont résolues : la préparation passe en
+     * {@code FETCHING_QUESTIONS} (tirage filtré).
+     */
+    record RoomPlayedQuestionsLoadedEvent(
             String roomId,
             Instant loadedAt
     ) implements RoomEvent {

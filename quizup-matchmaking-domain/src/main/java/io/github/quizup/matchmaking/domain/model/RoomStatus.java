@@ -7,7 +7,10 @@ package io.github.quizup.matchmaking.domain.model;
  *       (sortie/rejointure autorisées).</li>
  *   <li>{@link #FETCHING_PLAYERS} — les deux joueurs sont présents, récupération des profils
  *       (sortie refusée : le duel est engagé).</li>
- *   <li>{@link #FETCHING_QUESTIONS} — profils résolus, tirage des questions.</li>
+ *   <li>{@link #FETCHING_PLAYED_QUESTIONS} — profils résolus, récupération des questions déjà
+ *       jouées par les joueurs (quizup-game) pour éviter les répétitions.</li>
+ *   <li>{@link #FETCHING_QUESTIONS} — historique résolu, tirage des questions (préférences :
+ *       jamais jouées puis difficulté déduite du niveau).</li>
  *   <li>{@link #CREATING_GAME} — questions prêtes, la partie est créée immédiatement.</li>
  *   <li>{@link #GAME_CREATED} — la partie est créée (accusé du service game) ; la salle peut
  *       être clôturée.</li>
@@ -23,6 +26,7 @@ package io.github.quizup.matchmaking.domain.model;
 public enum RoomStatus {
     WAITING_PLAYERS,
     FETCHING_PLAYERS,
+    FETCHING_PLAYED_QUESTIONS,
     FETCHING_QUESTIONS,
     CREATING_GAME,
     GAME_CREATED,

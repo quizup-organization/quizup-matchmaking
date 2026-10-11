@@ -1,6 +1,7 @@
 package io.github.quizup.matchmaking.domain.port.out;
 
 import io.github.quizup.matchmaking.domain.model.DrawnQuestion;
+import io.github.quizup.matchmaking.domain.model.DrawnQuestionDifficulty;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 
 import java.util.List;
@@ -13,6 +14,11 @@ import java.util.Set;
  */
 public interface QuestionDrawPort {
 
-    /** Tire les questions approuvées disponibles dans toutes les langues demandées. */
-    List<DrawnQuestion> draw(String topicId, Set<Language> languages);
+    /**
+     * Tire les questions approuvées disponibles dans toutes les langues demandées.
+     * {@code target} (difficulté déduite) et {@code excludeQuestionIds} (jamais-jouées) sont des
+     * <b>préférences</b> best-effort côté theme.
+     */
+    List<DrawnQuestion> draw(String topicId, Set<Language> languages,
+                             DrawnQuestionDifficulty target, Set<String> excludeQuestionIds);
 }

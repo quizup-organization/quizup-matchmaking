@@ -63,6 +63,12 @@ public interface RoomCommand {
     ) implements RoomCommand {
     }
 
+    /** Commande interne (saga) : les questions déjà jouées par les joueurs sont résolues. */
+    record MarkRoomPlayedQuestionsLoadedCommand(
+            @TargetAggregateIdentifier String roomId
+    ) implements RoomCommand {
+    }
+
     /** Commande interne (saga) : les questions sont tirées, la création de la partie peut démarrer. */
     record MarkRoomQuestionsLoadedCommand(
             @TargetAggregateIdentifier String roomId

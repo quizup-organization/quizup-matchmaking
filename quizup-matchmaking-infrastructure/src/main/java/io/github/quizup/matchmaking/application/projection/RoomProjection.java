@@ -72,6 +72,16 @@ public class RoomProjection {
     @Transactional
     public void on(RoomEvent.RoomPlayersLoadedEvent event) {
         update(event.roomId(), room -> room.toBuilder()
+                .status(RoomStatus.FETCHING_PLAYED_QUESTIONS)
+                .updatedAt(event.loadedAt())
+                .build());
+    }
+
+    /** Historique des questions jouées résolu : le tirage filtré peut démarrer. */
+    @EventHandler
+    @Transactional
+    public void on(RoomEvent.RoomPlayedQuestionsLoadedEvent event) {
+        update(event.roomId(), room -> room.toBuilder()
                 .status(RoomStatus.FETCHING_QUESTIONS)
                 .updatedAt(event.loadedAt())
                 .build());

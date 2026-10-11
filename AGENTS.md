@@ -43,13 +43,15 @@ Trois responsabilités **distinctes**, chacune avec son agrégat :
 
 - `MatchmakingStatus = SEARCHING | COMPLETED | CANCELLED | FAILED` ;
   `ChallengeStatus = PENDING | ACCEPTED | DECLINED | CANCELLED | EXPIRED`.
-- `RoomStatus = WAITING_PLAYERS | FETCHING_PLAYERS | FETCHING_QUESTIONS | CREATING_GAME |
-  GAME_CREATED | COMPLETED | CANCELLED | EXPIRED | FAILED` : le statut suit l'**avancement de la préparation** et est poussé au
-  client (WS + `RoomView`).
+- `RoomStatus = WAITING_PLAYERS | FETCHING_PLAYERS | FETCHING_PLAYED_QUESTIONS | FETCHING_QUESTIONS |
+  CREATING_GAME | GAME_CREATED | COMPLETED | CANCELLED | EXPIRED | FAILED` : le statut suit
+  l'**avancement de la préparation** et est poussé au client (WS + `RoomView`).
   - `WAITING_PLAYERS` → `ALL_PRESENT` → `FETCHING_PLAYERS` → `MarkRoomPlayersLoadedCommand` →
-    `FETCHING_QUESTIONS` → `MarkRoomQuestionsLoadedCommand` → `CREATING_GAME` (demande de création
-    de la partie, fire-and-forget) → `MarkRoomGameCreatedCommand` → `GAME_CREATED` (accusé du
-    service game) → `CompleteRoomCommand` → `COMPLETED`.
+    `FETCHING_PLAYED_QUESTIONS` → `MarkRoomPlayedQuestionsLoadedCommand` → `FETCHING_QUESTIONS`
+    (tirage filtré : jamais-jouées + difficulté déduite) → `MarkRoomQuestionsLoadedCommand` →
+    `CREATING_GAME` (demande de création de la partie, fire-and-forget) →
+    `MarkRoomGameCreatedCommand` → `GAME_CREATED` (accusé du service game) →
+    `CompleteRoomCommand` → `COMPLETED`.
   - `CANCELLED` = annulée par l'initiateur ; `EXPIRED` = jamais lancée, expirée ;
     `FAILED` = échec de préparation, accusé de création absent (`GAME_CREATION_TIMEOUT`) ou
     création impossible.
@@ -81,13 +83,13 @@ service applicatif injecté, jamais un type d'un autre `*-domain`.
 - `ChallengeCommand` : `CreateChallengeCommand`, `Accept/Decline/Cancel/Expire/Purge`.
 - `RoomCommand` : `CreateRoomCommand` (`vsBot`, `botDifficulty`), `JoinRoomCommand` (apparition),
   `LeaveRoomCommand` (refusée après engagement), `CancelRoomCommand` (toujours possible tant que
-  non terminale), `MarkRoomPlayersLoadedCommand`, `MarkRoomQuestionsLoadedCommand`,
-  `MarkRoomGameCreatedCommand` (accusé du service game), `CompleteRoomCommand`, `FailRoomCommand`,
-  `ExpireRoomCommand`, `PurgeRoomCommand`.
+  non terminale), `MarkRoomPlayersLoadedCommand`, `MarkRoomPlayedQuestionsLoadedCommand`,
+  `MarkRoomQuestionsLoadedCommand`, `MarkRoomGameCreatedCommand` (accusé du service game),
+  `CompleteRoomCommand`, `FailRoomCommand`, `ExpireRoomCommand`, `PurgeRoomCommand`.
 - `RoomEvent` : `RoomCreatedEvent` (`vsBot`, `botDifficulty`), `RoomEnteredEvent`,
-  `RoomAllPlayersPresentEvent`, `RoomPlayersLoadedEvent`, `RoomQuestionsLoadedEvent`,
-  `RoomGameCreatedEvent`, `RoomLeftEvent`, `RoomCancelledEvent`, `RoomCompletedEvent`,
-  `RoomFailedEvent`, `RoomExpiredEvent`, `RoomPurgedEvent`.
+  `RoomAllPlayersPresentEvent`, `RoomPlayersLoadedEvent`, `RoomPlayedQuestionsLoadedEvent`,
+  `RoomQuestionsLoadedEvent`, `RoomGameCreatedEvent`, `RoomLeftEvent`, `RoomCancelledEvent`,
+  `RoomCompletedEvent`, `RoomFailedEvent`, `RoomExpiredEvent`, `RoomPurgedEvent`.
 - `MatchmakingQuery`, `ChallengeQuery`, `RoomQuery` (`GetRoomById`, `GetMyOpenRooms`,
   `GetRoomEventsQuery`).
 
@@ -96,13 +98,15 @@ service applicatif injecté, jamais un type d'un autre `*-domain`.
 | Port sortant              | Service cible     | Query Axon envoyée (QueryGateway)          |
 |---------------------------|-------------------|--------------------------------------------|
 | `ProfileRepositoryPort`   | `quizup-profile`  | `ProfileQuery.GetProfileQuery` + `ProgressionQuery.GetProgressionQuery` |
+| `PlayedQuestionsPort`     | `quizup-game`     | `GameQuery.GetPlayedQuestionIdsQuery` (questions déjà jouées, adaptée en `Set<String>` local) |
 | `TopicAvailabilityPort`   | `quizup-theme`    | `QuestionQuery.CountApprovedQuestionsByTopicAndLanguagesQuery` |
-| `QuestionDrawPort`        | `quizup-theme`    | `QuestionQuery.GetRandomApprovedQuestionsQuery` (adaptée en `DrawnQuestion` local) |
+| `QuestionDrawPort`        | `quizup-theme`    | `QuestionQuery.GetRandomApprovedQuestionsQuery` (préférences jamais-jouées + difficulté cible, adaptée en `DrawnQuestion` local) |
 
 Implémentations : `application/service/PlayerService` (profil salle + progression),
+`PlayedQuestionsService` (historique des questions jouées, `Set<String>` local),
 `TopicAvailabilityService` (couverture des langues, filtre de candidats),
-`QuestionDrawService` (adaptateur de `QuestionDrawPort` : tirage strict `ORDER BY RANDOM()` dans
-toutes les langues + mapping `theme.Question → DrawnQuestion` local ; la traduction vers
+`QuestionDrawService` (adaptateur de `QuestionDrawPort` : tirage strict sur les langues avec
+préférences de tri best-effort + mapping `theme.Question → DrawnQuestion` local ; la traduction vers
 `game.GameQuestion` est faite par la saga émettrice elle-même, comme le préconise
 `command-preparation.md`).
 
@@ -141,8 +145,12 @@ toutes les langues + mapping `theme.Question → DrawnQuestion` local ; la tradu
   par l'agrégat (événement d'apparition appliqué à la création) : aucun join système côté saga.
 - `RoomEnteredEvent` (apparition client) → mémorise le participant (non-initiateur).
 - `RoomAllPlayersPresentEvent` → étape **profils** ; `RoomPlayersLoadedEvent` → étape
-  **questions** (vérification du sujet n°2) ; chaque étape avance le statut de la salle.
-  Questions insuffisantes → `FailRoomCommand` immédiat (`TOPIC_NOT_AVAILABLE_IN_LANGUAGE`).
+  **historique des questions jouées** (`PlayedQuestionsPort`, quizup-game, joueurs humains
+  uniquement) ; `RoomPlayedQuestionsLoadedEvent` → étape **questions** : tirage filtré
+  (`QuestionDrawPort`) avec préférences jamais-jouées + difficulté cible déduite du niveau moyen
+  des joueurs (`QuestionLevelRules` : ≤9 EASY, 10–19 MEDIUM, 20–39 HARD, ≥40 EXPERT) ; chaque étape
+  avance le statut de la salle. Questions insuffisantes → `FailRoomCommand` immédiat
+  (`TOPIC_NOT_AVAILABLE_IN_LANGUAGE`).
 - `RoomQuestionsLoadedEvent` → la saga envoie `CreateGameCommand` en **fire-and-forget**
   (HUMAN/HUMAN ou HUMAN/BOT, commande assemblée par `GamePreparationService` — le mapping local →
   `game.GameQuestion` ne vit pas dans la saga) et s'associe au `gameId` ; `GameCreatedEvent` →
@@ -169,7 +177,7 @@ toutes les langues + mapping `theme.Question → DrawnQuestion` local ; la tradu
   `GET /mine` (initiateur **ou** invité) ; `POST /{roomId}/join` (**apparition unique**) ;
   `POST /{roomId}/leave` (refusée après engagement) | `cancel` (initiateur, toujours possible) ;
   `GET /{roomId}/notifications` ; WS `/topic/rooms/{roomId}`
-  (`ROOM_CREATED|ROOM_ENTERED|ROOM_ALL_PRESENT|ROOM_PLAYERS_LOADED|ROOM_QUESTIONS_LOADED|ROOM_GAME_CREATED|ROOM_LEFT|ROOM_COMPLETED|ROOM_CANCELLED|ROOM_EXPIRED|ROOM_FAILED`).
+  (`ROOM_CREATED|ROOM_ENTERED|ROOM_ALL_PRESENT|ROOM_PLAYERS_LOADED|ROOM_PLAYED_QUESTIONS_LOADED|ROOM_QUESTIONS_LOADED|ROOM_GAME_CREATED|ROOM_LEFT|ROOM_COMPLETED|ROOM_CANCELLED|ROOM_EXPIRED|ROOM_FAILED`).
 - **Notifications personnelles** : consommées par `quizup-notification` depuis le bus Kafka
   (`CHALLENGE_RECEIVED`, `CHALLENGE_DECLINED`, `ROOM_ACCEPTED`) ; poussées par le BFF sur
   `/topic/notifications/{userId}`.

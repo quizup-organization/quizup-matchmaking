@@ -157,6 +157,16 @@ public class RoomAggregate {
         apply(new RoomEvent.RoomPlayersLoadedEvent(roomId, Instant.now()));
     }
 
+    /** Commande interne (saga) : l'historique des questions jouées est résolu (quizup-game). */
+    @CommandHandler
+    public void handle(RoomCommand.MarkRoomPlayedQuestionsLoadedCommand command) {
+        if (status != RoomStatus.FETCHING_PLAYED_QUESTIONS) {
+            return;
+        }
+        logger.info("Played questions loaded in room: roomId={}", roomId);
+        apply(new RoomEvent.RoomPlayedQuestionsLoadedEvent(roomId, Instant.now()));
+    }
+
     /** Commande interne (saga) : les questions sont tirées ; la saga lance la création de la partie. */
     @CommandHandler
     public void handle(RoomCommand.MarkRoomQuestionsLoadedCommand command) {
@@ -293,6 +303,11 @@ public class RoomAggregate {
 
     @EventSourcingHandler
     public void on(RoomEvent.RoomPlayersLoadedEvent event) {
+        this.status = RoomStatus.FETCHING_PLAYED_QUESTIONS;
+    }
+
+    @EventSourcingHandler
+    public void on(RoomEvent.RoomPlayedQuestionsLoadedEvent event) {
         this.status = RoomStatus.FETCHING_QUESTIONS;
     }
 

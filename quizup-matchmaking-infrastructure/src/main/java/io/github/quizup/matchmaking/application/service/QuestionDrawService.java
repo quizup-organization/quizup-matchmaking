@@ -4,12 +4,14 @@ import io.github.quizup.game.domain.model.GameRules;
 import io.github.quizup.matchmaking.domain.model.DrawnQuestion;
 import io.github.quizup.matchmaking.domain.model.DrawnQuestionChoice;
 import io.github.quizup.matchmaking.domain.model.DrawnQuestionContent;
+import io.github.quizup.matchmaking.domain.model.DrawnQuestionDifficulty;
 import io.github.quizup.matchmaking.domain.port.out.QuestionDrawPort;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import io.github.quizup.microservice.core.infrastructure.axon.QueryResponseTypes;
 import io.github.quizup.theme.domain.model.Question;
 import io.github.quizup.theme.domain.model.QuestionChoice;
 import io.github.quizup.theme.domain.model.QuestionContent;
+import io.github.quizup.theme.domain.model.QuestionDifficulty;
 import io.github.quizup.theme.domain.query.QuestionQuery;
 import org.axonframework.queryhandling.QueryGateway;
 import org.springframework.stereotype.Service;
@@ -22,8 +24,9 @@ import java.util.Set;
 import static java.util.Objects.isNull;
 
 /**
- * Adaptateur sortant du port {@link QuestionDrawPort} : tirage aléatoire strict des questions
- * approuvées (quizup-theme) et mapping vers le <b>modèle local</b> du domaine matchmaking
+ * Adaptateur sortant du port {@link QuestionDrawPort} : tirage aléatoire strict sur les langues
+ * (quizup-theme), avec **préférences** de tri best-effort — jamais-jouées puis difficulté déduite
+ * du niveau des joueurs — et mapping vers le <b>modèle local</b> du domaine matchmaking
  * (un {@code *-domain} ne dépend jamais d'un autre service).
  * <p>
  * Appelé par la saga salle (fenêtre d'attente) et non par un handler de commande : l'I/O
@@ -39,12 +42,21 @@ public class QuestionDrawService implements QuestionDrawPort {
     }
 
     @Override
-    public List<DrawnQuestion> draw(String topicId, Set<Language> languages) {
+    public List<DrawnQuestion> draw(String topicId, Set<Language> languages,
+                                    DrawnQuestionDifficulty target, Set<String> excludeQuestionIds) {
         if (languages == null || languages.isEmpty()) {
             return List.of();
         }
+        Set<QuestionDifficulty> difficulties = target == null
+                ? Set.of()
+                : Set.of(QuestionDifficulty.valueOf(target.name()));
         List<Question> questions = queryGateway.query(
-                new QuestionQuery.GetRandomApprovedQuestionsQuery(topicId, GameRules.TOTAL_ROUNDS, languages),
+                new QuestionQuery.GetRandomApprovedQuestionsQuery(
+                        topicId,
+                        GameRules.TOTAL_ROUNDS,
+                        languages,
+                        difficulties,
+                        excludeQuestionIds == null ? Set.of() : excludeQuestionIds),
                 QueryResponseTypes.multipleInstancesOf(Question.class)
         ).join();
         return questions.stream().map(QuestionDrawService::toDrawnQuestion).toList();

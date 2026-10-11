@@ -6,8 +6,11 @@ import io.github.quizup.matchmaking.application.service.GamePreparationService;
 import io.github.quizup.matchmaking.domain.command.RoomCommand;
 import io.github.quizup.matchmaking.domain.event.RoomEvent;
 import io.github.quizup.matchmaking.domain.model.DrawnQuestion;
+import io.github.quizup.matchmaking.domain.model.DrawnQuestionDifficulty;
+import io.github.quizup.matchmaking.domain.model.QuestionLevelRules;
 import io.github.quizup.matchmaking.domain.model.RoomDeadline;
 import io.github.quizup.matchmaking.domain.model.RoomPlayer;
+import io.github.quizup.matchmaking.domain.port.out.PlayedQuestionsPort;
 import io.github.quizup.matchmaking.domain.port.out.ProfileRepositoryPort;
 import io.github.quizup.matchmaking.domain.port.out.QuestionDrawPort;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
@@ -39,9 +42,11 @@ import java.util.UUID;
  *       ({@code vsBot}) est appliquée par l'agrégat à la création (aucun join système côté saga).</li>
  *   <li>{@code RoomEnteredEvent} → mémorise le participant (apparition client-driven).</li>
  *   <li>{@code RoomAllPlayersPresentEvent} → étape <b>profils</b> ({@link ProfileRepositoryPort},
- *       bot exclu) ; {@code RoomPlayersLoadedEvent} → étape <b>questions</b>
- *       ({@link QuestionDrawPort}, vérification du sujet n°2) ; chaque étape avance le statut de
- *       la salle. Questions insuffisantes → échec immédiat de la salle.</li>
+ *       bot exclu) ; {@code RoomPlayersLoadedEvent} → étape <b>historique des questions jouées</b>
+ *       ({@link PlayedQuestionsPort}, quizup-game) ; {@code RoomPlayedQuestionsLoadedEvent} → étape
+ *       <b>questions</b> ({@link QuestionDrawPort}, vérification du sujet n°2, préférences
+ *       jamais-jouées + difficulté déduite du niveau) ; chaque étape avance le statut de la salle.
+ *       Questions insuffisantes → échec immédiat de la salle.</li>
  *   <li>{@code RoomQuestionsLoadedEvent} → envoi de {@code CreateGameCommand} (assemblé par
  *       {@link GamePreparationService}) en <b>fire-and-forget</b>, association sur {@code gameId}
  *       et deadline d'accusé ; {@code GameCreatedEvent} → {@code MarkRoomGameCreatedCommand} puis
@@ -70,6 +75,9 @@ public class RoomSaga {
 
     @Autowired
     private transient QuestionDrawPort questionDrawPort;
+
+    @Autowired
+    private transient PlayedQuestionsPort playedQuestionsPort;
 
     @Autowired
     private transient GamePreparationService gamePreparationService;
@@ -124,6 +132,10 @@ public class RoomSaga {
 
     @Getter
     @Setter
+    private Set<String> playedQuestionIds;
+
+    @Getter
+    @Setter
     private List<DrawnQuestion> drawnQuestions;
 
     @StartSaga
@@ -160,10 +172,17 @@ public class RoomSaga {
         loadPlayers();
     }
 
-    /** Profils résolus : étape 2, tirage des questions (vérification du sujet n°2). */
+    /** Profils résolus : étape 2, résolution de l'historique des questions jouées (quizup-game). */
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomPlayersLoadedEvent event) {
-        logger.info("Profils chargés, tirage des questions: roomId={}", roomId);
+        logger.info("Profils chargés, résolution de l'historique des questions: roomId={}", roomId);
+        resolvePlayedQuestions();
+    }
+
+    /** Historique résolu : étape 3, tirage filtré des questions (vérification du sujet n°2). */
+    @SagaEventHandler(associationProperty = "roomId")
+    public void on(RoomEvent.RoomPlayedQuestionsLoadedEvent event) {
+        logger.info("Historique résolu, tirage des questions: roomId={}", roomId);
         loadQuestions();
     }
 
@@ -188,13 +207,39 @@ public class RoomSaga {
         return initiatorProfile != null && (vsBot || participantProfile != null);
     }
 
-    /** Étape questions : tirage dans les langues des joueurs (vérification du sujet n°2). */
+    /** Étape historique : questions déjà jouées par les joueurs humains de la salle. */
+    private void resolvePlayedQuestions() {
+        if (playedQuestionIds != null || !playersLoaded()) {
+            return;
+        }
+        this.playedQuestionIds = playedQuestionsPort.findPlayedQuestionIds(
+                topicId, humanPlayerIds());
+        commandGateway.send(new RoomCommand.MarkRoomPlayedQuestionsLoadedCommand(roomId));
+    }
+
+    /** Joueurs humains de la salle (le bot n'a pas d'historique). */
+    private Set<String> humanPlayerIds() {
+        Set<String> playerIds = new HashSet<>();
+        playerIds.add(initiatorId);
+        if (!vsBot && participantId != null) {
+            playerIds.add(participantId);
+        }
+        return playerIds;
+    }
+
+    /** Étape questions : tirage filtré (jamais-jouées, difficulté déduite) — vérification du sujet n°2. */
     private void loadQuestions() {
         if (drawnQuestions != null || !playersLoaded()) {
             return;
         }
-        List<DrawnQuestion> drawn = questionDrawPort.draw(topicId,
-                languagesOf(initiatorProfile, participantProfile));
+        DrawnQuestionDifficulty target = QuestionLevelRules.targetFor(
+                initiatorProfile.level(),
+                participantProfile == null ? null : participantProfile.level());
+        List<DrawnQuestion> drawn = questionDrawPort.draw(
+                topicId,
+                languagesOf(initiatorProfile, participantProfile),
+                target,
+                playedQuestionIds == null ? Set.of() : playedQuestionIds);
         if (drawn.size() < GameRules.TOTAL_ROUNDS) {
             logger.warn("Thème insuffisant dans les langues requises, échec de la salle: roomId={}, topicId={}, questions={}",
                     roomId, topicId, drawn.size());
