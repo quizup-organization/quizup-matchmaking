@@ -1,3 +1,13 @@
+## [8.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v7.0.0...v8.0.0) (2026-10-11)
+
+### ⚠ BREAKING CHANGES
+
+* **matchmaking:** contrats RoomEvent/MatchmakingEvent/ChallengeEvent (échéance déplacée, gameId de revanche, deadline de recherche).
+
+### Features
+
+* **matchmaking:** lancement après préparation, revanche gameId, deadline de recherche ([8e8a302](https://github.com/quizup-organization/quizup-matchmaking/commit/8e8a30292c8b84fdcd29da9ce3cd880683f77219))
+
 ## [7.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v6.0.0...v7.0.0) (2026-10-11)
 
 ### ⚠ BREAKING CHANGES
