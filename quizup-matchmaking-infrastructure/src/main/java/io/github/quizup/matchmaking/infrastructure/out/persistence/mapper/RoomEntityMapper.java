@@ -16,10 +16,10 @@ public final class RoomEntityMapper {
                 .opponentId(entity.getOpponentId())
                 .participantId(entity.getParticipantId())
                 .gameId(entity.getGameId())
+                .vsBot(entity.isVsBot())
                 .status(entity.getStatus())
                 .initiatorPresent(entity.isInitiatorPresent())
                 .participantPresent(entity.isParticipantPresent())
-                .allPresentAt(entity.getAllPresentAt())
                 .readyDeadlineAt(entity.getReadyDeadlineAt())
                 .createdAt(entity.getCreatedAt())
                 .expiresAt(entity.getExpiresAt())
@@ -35,10 +35,10 @@ public final class RoomEntityMapper {
         entity.setOpponentId(room.opponentId());
         entity.setParticipantId(room.participantId());
         entity.setGameId(room.gameId());
+        entity.setVsBot(room.vsBot());
         entity.setStatus(room.status());
         entity.setInitiatorPresent(room.initiatorPresent());
         entity.setParticipantPresent(room.participantPresent());
-        entity.setAllPresentAt(room.allPresentAt());
         entity.setReadyDeadlineAt(room.readyDeadlineAt());
         entity.setCreatedAt(room.createdAt());
         entity.setExpiresAt(room.expiresAt());

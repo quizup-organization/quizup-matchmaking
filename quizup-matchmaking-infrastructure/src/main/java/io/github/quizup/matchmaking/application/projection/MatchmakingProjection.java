@@ -9,6 +9,8 @@ import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.function.UnaryOperator;
+
 /**
  * Read model « ticket » d'appariement (vue produit) ; sert aussi d'index au pool
  * ({@code status = SEARCHING}, {@code claimed_by} null).
@@ -43,9 +45,9 @@ public class MatchmakingProjection {
     @Transactional
     public void on(MatchmakingEvent.MatchmakingMatchedEvent event) {
         update(event.matchmakingId(), matchmaking -> matchmaking.toBuilder()
-                .status(MatchmakingStatus.CLOSED)
+                .status(MatchmakingStatus.COMPLETED)
                 .opponentId(event.opponentId())
-                .gameId(event.gameId())
+                .roomId(event.roomId())
                 .vsBot(event.vsBot())
                 .updatedAt(event.matchedAt())
                 .build());
@@ -55,7 +57,7 @@ public class MatchmakingProjection {
     @Transactional
     public void on(MatchmakingEvent.MatchmakingCancelledEvent event) {
         update(event.matchmakingId(), matchmaking -> matchmaking.toBuilder()
-                .status(MatchmakingStatus.CLOSED)
+                .status(MatchmakingStatus.CANCELLED)
                 .updatedAt(event.cancelledAt())
                 .build());
     }
@@ -75,7 +77,7 @@ public class MatchmakingProjection {
         repository.deleteById(event.matchmakingId());
     }
 
-    private void update(String matchmakingId, java.util.function.UnaryOperator<Matchmaking> transform) {
+    private void update(String matchmakingId, UnaryOperator<Matchmaking> transform) {
         repository.findById(matchmakingId).ifPresent(matchmaking ->
                 repository.save(transform.apply(matchmaking)));
     }

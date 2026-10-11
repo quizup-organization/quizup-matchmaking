@@ -79,7 +79,7 @@ public class ChallengeSaga {
             String roomId = ChallengeRoomId.of(event.challengeId());
             logger.info("Défi accepté → création de la salle: challengeId={}, roomId={}", challengeId, roomId);
             commandGateway.send(new RoomCommand.CreateRoomCommand(
-                    roomId, event.topicId(), event.challengerId(), event.opponentId()));
+                    roomId, event.topicId(), event.challengerId(), event.opponentId(), false, null));
         }
     }
 

@@ -74,4 +74,13 @@ public final class RoomExceptions {
                     "Second participant absent", "Un second participant est requis pour clore la salle");
         }
     }
+
+    /** Une fois la préparation engagée (les deux présents), la salle ne peut plus être quittée. */
+    public static class RoomPreparationStartedProblem extends RoomProblem {
+        public RoomPreparationStartedProblem(String roomId) {
+            super(roomId, "urn:quizup:room:preparationStarted",
+                    "Préparation engagée",
+                    "La salle ne peut plus être quittée une fois la préparation de la partie lancée");
+        }
+    }
 }

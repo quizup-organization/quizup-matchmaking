@@ -39,8 +39,8 @@ public class MatchmakingEntity {
     @Column(name = "opponent_id")
     private String opponentId;
 
-    @Column(name = "game_id")
-    private String gameId;
+    @Column(name = "room_id")
+    private String roomId;
 
     @Column(name = "vs_bot", nullable = false)
     private boolean vsBot;

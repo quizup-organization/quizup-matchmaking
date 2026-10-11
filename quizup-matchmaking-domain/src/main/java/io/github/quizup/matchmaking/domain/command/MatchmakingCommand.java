@@ -29,11 +29,11 @@ public interface MatchmakingCommand {
     ) implements MatchmakingCommand {
     }
 
-    /** Commande interne (saga) : la recherche a abouti (adversaire humain ou bot). */
+    /** Commande interne (saga) : la recherche a abouti (salle d'appariement créée). */
     record MarkMatchmakingMatchedCommand(
             @TargetAggregateIdentifier String matchmakingId,
             String opponentId,
-            String gameId,
+            String roomId,
             boolean vsBot
     ) implements MatchmakingCommand {
     }

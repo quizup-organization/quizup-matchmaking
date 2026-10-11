@@ -22,7 +22,7 @@ public interface MatchmakingEvent {
     record MatchmakingMatchedEvent(
             String matchmakingId,
             String opponentId,
-            String gameId,
+            String roomId,
             boolean vsBot,
             Instant matchedAt
     ) implements MatchmakingEvent {

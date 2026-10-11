@@ -10,10 +10,12 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 
 /**
- * Test Axon in-memory de {@link RoomAggregate} (salle, deux humains).
+ * Test Axon in-memory de {@link RoomAggregate} (salle : deux humains ou humain/bot).
  * <p>
  * Le client émet une unique commande d'apparition ({@code JoinRoomCommand}) : présence et
- * enregistrement du second participant.
+ * enregistrement du second participant ; seul le bot est joint automatiquement par la saga.
+ * Après l'apparition des deux joueurs, la préparation avance par commandes de phase et la
+ * salle ne peut plus être quittée (l'annulation reste possible).
  */
 class RoomAggregateTest {
 
@@ -30,21 +32,32 @@ class RoomAggregateTest {
     @Test
     void createRoom_appliesCreatedEvent() {
         fixture.givenNoPriorActivity()
-                .when(new RoomCommand.CreateRoomCommand(ROOM_ID, TOPIC, INITIATOR, null))
+                .when(new RoomCommand.CreateRoomCommand(ROOM_ID, TOPIC, INITIATOR, null, false, null))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         RoomEvent.RoomCreatedEvent.class,
                         e -> ((RoomEvent.RoomCreatedEvent) e).roomId().equals(ROOM_ID)
                                 && ((RoomEvent.RoomCreatedEvent) e).initiatorId().equals(INITIATOR)
-                                && ((RoomEvent.RoomCreatedEvent) e).opponentId() == null));
+                                && ((RoomEvent.RoomCreatedEvent) e).opponentId() == null
+                                && !((RoomEvent.RoomCreatedEvent) e).vsBot()));
     }
 
     @Test
     void createNominalRoom_appliesCreatedEventWithOpponent() {
         fixture.givenNoPriorActivity()
-                .when(new RoomCommand.CreateRoomCommand(ROOM_ID, TOPIC, INITIATOR, OPPONENT))
+                .when(new RoomCommand.CreateRoomCommand(ROOM_ID, TOPIC, INITIATOR, OPPONENT, false, null))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         RoomEvent.RoomCreatedEvent.class,
                         e -> OPPONENT.equals(((RoomEvent.RoomCreatedEvent) e).opponentId())));
+    }
+
+    @Test
+    void createBotRoom_carriesDifficultyAndBotFlag() {
+        fixture.givenNoPriorActivity()
+                .when(new RoomCommand.CreateRoomCommand(ROOM_ID, TOPIC, INITIATOR, OPPONENT, true, "HARD"))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        RoomEvent.RoomCreatedEvent.class,
+                        e -> ((RoomEvent.RoomCreatedEvent) e).vsBot()
+                                && "HARD".equals(((RoomEvent.RoomCreatedEvent) e).botDifficulty())));
     }
 
     @Test
@@ -91,6 +104,15 @@ class RoomAggregateTest {
     }
 
     @Test
+    void botRoom_letsBotJoinAutomatically() {
+        fixture.given(createdBot())
+                .when(new RoomCommand.JoinRoomCommand(ROOM_ID, OPPONENT))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                        RoomEvent.RoomEnteredEvent.class,
+                        e -> OPPONENT.equals(((RoomEvent.RoomEnteredEvent) e).playerId())));
+    }
+
+    @Test
     void sharedRoom_refusesThirdPlayer() {
         fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT))
                 .when(new RoomCommand.JoinRoomCommand(ROOM_ID, OTHER))
@@ -98,21 +120,61 @@ class RoomAggregateTest {
     }
 
     @Test
-    void joinAfterLeave_relaunchesReadyCheck() {
-        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT),
-                        new RoomEvent.RoomLeftEvent(ROOM_ID, PARTICIPANT, Instant.now()))
-                .when(new RoomCommand.JoinRoomCommand(ROOM_ID, PARTICIPANT))
-                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
-                        RoomEvent.RoomAllPlayersPresentEvent.class, e -> true));
+    void playersLoaded_advancesPreparation() {
+        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent())
+                .when(new RoomCommand.MarkRoomPlayersLoadedCommand(ROOM_ID))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        RoomEvent.RoomPlayersLoadedEvent.class,
+                        e -> ROOM_ID.equals(((RoomEvent.RoomPlayersLoadedEvent) e).roomId())));
     }
 
     @Test
-    void leave_clearsPresenceWithoutClosingRoom() {
-        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT))
-                .when(new RoomCommand.LeaveRoomCommand(ROOM_ID, PARTICIPANT))
+    void playersLoaded_ignoredWhenPlayersNotPresent() {
+        fixture.given(created())
+                .when(new RoomCommand.MarkRoomPlayersLoadedCommand(ROOM_ID))
+                .expectNoEvents();
+    }
+
+    @Test
+    void questionsLoaded_advancesPreparation() {
+        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent(), playersLoaded())
+                .when(new RoomCommand.MarkRoomQuestionsLoadedCommand(ROOM_ID))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        RoomEvent.RoomQuestionsLoadedEvent.class,
+                        e -> ROOM_ID.equals(((RoomEvent.RoomQuestionsLoadedEvent) e).roomId())));
+    }
+
+    @Test
+    void questionsLoaded_ignoredBeforePlayersLoaded() {
+        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent())
+                .when(new RoomCommand.MarkRoomQuestionsLoadedCommand(ROOM_ID))
+                .expectNoEvents();
+    }
+
+    @Test
+    void leave_clearsPresenceBeforePreparation() {
+        fixture.given(created(), entered(INITIATOR))
+                .when(new RoomCommand.LeaveRoomCommand(ROOM_ID, INITIATOR))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         RoomEvent.RoomLeftEvent.class,
-                        e -> PARTICIPANT.equals(((RoomEvent.RoomLeftEvent) e).playerId())));
+                        e -> INITIATOR.equals(((RoomEvent.RoomLeftEvent) e).playerId())));
+    }
+
+    @Test
+    void rejoin_afterLeaveIsAllowedBeforePreparation() {
+        fixture.given(created(), entered(INITIATOR),
+                        new RoomEvent.RoomLeftEvent(ROOM_ID, INITIATOR, Instant.now()))
+                .when(new RoomCommand.JoinRoomCommand(ROOM_ID, INITIATOR))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                        RoomEvent.RoomEnteredEvent.class,
+                        e -> INITIATOR.equals(((RoomEvent.RoomEnteredEvent) e).playerId())));
+    }
+
+    @Test
+    void leave_refusedOncePreparationStarted() {
+        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent())
+                .when(new RoomCommand.LeaveRoomCommand(ROOM_ID, PARTICIPANT))
+                .expectException(RoomExceptions.RoomPreparationStartedProblem.class);
     }
 
     @Test
@@ -131,7 +193,8 @@ class RoomAggregateTest {
 
     @Test
     void complete_closesRoomWithoutImmediatePurge() {
-        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT))
+        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent(), playersLoaded(),
+                        questionsLoaded())
                 .when(new RoomCommand.CompleteRoomCommand(ROOM_ID, "game-1"))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         RoomEvent.RoomCompletedEvent.class,
@@ -152,6 +215,14 @@ class RoomAggregateTest {
                 .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
                         RoomEvent.RoomCancelledEvent.class,
                         e -> INITIATOR.equals(((RoomEvent.RoomCancelledEvent) e).initiatorId())));
+    }
+
+    @Test
+    void cancel_remainsAllowedDuringPreparation() {
+        fixture.given(created(), entered(INITIATOR), entered(PARTICIPANT), allPresent(), playersLoaded())
+                .when(new RoomCommand.CancelRoomCommand(ROOM_ID, INITIATOR))
+                .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
+                        RoomEvent.RoomCancelledEvent.class, e -> true));
     }
 
     @Test
@@ -180,15 +251,36 @@ class RoomAggregateTest {
 
     private static RoomEvent.RoomCreatedEvent created() {
         return new RoomEvent.RoomCreatedEvent(
-                ROOM_ID, TOPIC, INITIATOR, null, Instant.now().plusSeconds(3600), Instant.now());
+                ROOM_ID, TOPIC, INITIATOR, null, false, null,
+                Instant.now().plusSeconds(3600), Instant.now());
     }
 
     private static RoomEvent.RoomCreatedEvent createdWithOpponent() {
         return new RoomEvent.RoomCreatedEvent(
-                ROOM_ID, TOPIC, INITIATOR, OPPONENT, Instant.now().plusSeconds(3600), Instant.now());
+                ROOM_ID, TOPIC, INITIATOR, OPPONENT, false, null,
+                Instant.now().plusSeconds(3600), Instant.now());
+    }
+
+    private static RoomEvent.RoomCreatedEvent createdBot() {
+        return new RoomEvent.RoomCreatedEvent(
+                ROOM_ID, TOPIC, INITIATOR, OPPONENT, true, "NORMAL",
+                Instant.now().plusSeconds(3600), Instant.now());
     }
 
     private static RoomEvent.RoomEnteredEvent entered(String playerId) {
         return new RoomEvent.RoomEnteredEvent(ROOM_ID, playerId, Instant.now());
+    }
+
+    private static RoomEvent.RoomAllPlayersPresentEvent allPresent() {
+        return new RoomEvent.RoomAllPlayersPresentEvent(
+                ROOM_ID, Instant.now().plusSeconds(3), Instant.now());
+    }
+
+    private static RoomEvent.RoomPlayersLoadedEvent playersLoaded() {
+        return new RoomEvent.RoomPlayersLoadedEvent(ROOM_ID, Instant.now());
+    }
+
+    private static RoomEvent.RoomQuestionsLoadedEvent questionsLoaded() {
+        return new RoomEvent.RoomQuestionsLoadedEvent(ROOM_ID, Instant.now());
     }
 }

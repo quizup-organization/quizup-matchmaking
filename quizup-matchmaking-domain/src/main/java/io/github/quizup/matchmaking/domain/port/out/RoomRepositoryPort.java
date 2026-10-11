@@ -11,7 +11,8 @@ public interface RoomRepositoryPort {
 
     Optional<Room> findById(String roomId);
 
-    List<Room> findCreatedByPlayerId(String playerId);
+    /** Salles encore ouvertes d'un joueur ({@code WAITING_PLAYERS}, initiateur ou invité). */
+    List<Room> findWaitingByPlayerId(String playerId);
 
     void deleteById(String roomId);
 }

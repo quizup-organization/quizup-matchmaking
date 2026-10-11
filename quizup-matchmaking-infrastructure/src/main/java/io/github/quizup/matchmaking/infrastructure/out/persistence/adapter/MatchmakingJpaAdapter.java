@@ -61,7 +61,7 @@ public class MatchmakingJpaAdapter implements MatchmakingPoolPort, MatchmakingRe
         entity.setLevel(matchmaking.level());
         entity.setLanguages(MatchmakingEntityMapper.encodeLanguages(matchmaking.languages()));
         entity.setOpponentId(matchmaking.opponentId());
-        entity.setGameId(matchmaking.gameId());
+        entity.setRoomId(matchmaking.roomId());
         entity.setVsBot(matchmaking.vsBot());
         entity.setStatus(matchmaking.status());
         entity.setCreatedAt(matchmaking.createdAt());

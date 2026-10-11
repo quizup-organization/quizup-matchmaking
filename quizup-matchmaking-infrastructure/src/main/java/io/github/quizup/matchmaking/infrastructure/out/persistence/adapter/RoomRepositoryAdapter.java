@@ -34,9 +34,9 @@ public class RoomRepositoryAdapter implements RoomRepositoryPort {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Room> findCreatedByPlayerId(String playerId) {
+    public List<Room> findWaitingByPlayerId(String playerId) {
         return roomJpaRepository
-                .findCreatedByPlayerId(RoomStatus.CREATED, playerId)
+                .findByStatusAndPlayerId(RoomStatus.WAITING_PLAYERS, playerId)
                 .stream()
                 .map(RoomEntityMapper::toDomain)
                 .toList();

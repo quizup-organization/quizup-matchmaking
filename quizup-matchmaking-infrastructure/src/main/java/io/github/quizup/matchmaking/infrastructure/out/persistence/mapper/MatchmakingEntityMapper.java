@@ -36,8 +36,6 @@ public final class MatchmakingEntityMapper {
         return new MatchmakingCandidate(
                 entity.getMatchmakingId(),
                 entity.getPlayerId(),
-                entity.getTopicId(),
-                entity.getLevel(),
                 decodeLanguages(entity.getLanguages()),
                 entity.getCreatedAt());
     }
@@ -50,7 +48,7 @@ public final class MatchmakingEntityMapper {
                 .level(entity.getLevel())
                 .languages(decodeLanguages(entity.getLanguages()))
                 .opponentId(entity.getOpponentId())
-                .gameId(entity.getGameId())
+                .roomId(entity.getRoomId())
                 .vsBot(entity.isVsBot())
                 .status(entity.getStatus())
                 .createdAt(entity.getCreatedAt())

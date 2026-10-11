@@ -4,7 +4,6 @@ import io.github.quizup.matchmaking.domain.command.MatchmakingCommand;
 import io.github.quizup.matchmaking.domain.event.MatchmakingEvent;
 import io.github.quizup.matchmaking.domain.exception.MatchmakingExceptions;
 import io.github.quizup.matchmaking.domain.model.MatchmakingStatus;
-import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import org.apache.commons.lang3.StringUtils;
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventsourcing.EventSourcingHandler;
@@ -15,16 +14,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-import java.util.Set;
 
 import static org.axonframework.modelling.command.AggregateLifecycle.apply;
 
 /**
  * MatchmakingAggregate — recherche d'un adversaire pour un duel public (« Défier le monde »).
  * <p>
- * N'a aucune notion de salon : c'est une file d'appariement. La saga associe deux recherches
- * compatibles (même sujet, niveau ±5, langues couvertes par le sujet) ou bascule sur une partie
- * bot à l'échéance.
+ * File d'appariement pure : la saga associe deux recherches compatibles (même sujet, niveau ±5,
+ * langues couvertes par le sujet) et crée une <b>salle</b> ; elle ne prépare ni ne crée jamais la
+ * partie (c'est le rôle de la salle). L'agrégat ne conserve que ce dont ses handlers ont besoin
+ * (identifiant, joueur, statut, salle) : les critères d'appariement (sujet, niveau, langues) et
+ * l'issue (adversaire, vsBot) vivent dans les événements, consommés par la saga et le read model.
  */
 @Aggregate
 public class MatchmakingAggregate {
@@ -34,13 +34,8 @@ public class MatchmakingAggregate {
     @AggregateIdentifier
     private String matchmakingId;
     private String playerId;
-    private String topicId;
-    private int level;
-    private Set<Language> languages;
     private MatchmakingStatus status;
-    private String opponentId;
-    private String gameId;
-    private boolean vsBot;
+    private String roomId;
 
     protected MatchmakingAggregate() {
     }
@@ -73,8 +68,8 @@ public class MatchmakingAggregate {
 
     @CommandHandler
     public void handle(MatchmakingCommand.MarkMatchmakingMatchedCommand command) {
-        if (status == MatchmakingStatus.CLOSED) {
-            if (command.gameId().equals(gameId)) {
+        if (status == MatchmakingStatus.COMPLETED) {
+            if (command.roomId().equals(roomId)) {
                 return;
             }
             throw new MatchmakingExceptions.MatchmakingNotSearchingProblem(matchmakingId, status.name());
@@ -82,12 +77,12 @@ public class MatchmakingAggregate {
         if (status != MatchmakingStatus.SEARCHING) {
             throw new MatchmakingExceptions.MatchmakingNotSearchingProblem(matchmakingId, status.name());
         }
-        logger.info("Matching: matchmakingId={}, opponentId={}, gameId={}, vsBot={}",
-                matchmakingId, command.opponentId(), command.gameId(), command.vsBot());
+        logger.info("Matching: matchmakingId={}, opponentId={}, roomId={}, vsBot={}",
+                matchmakingId, command.opponentId(), command.roomId(), command.vsBot());
         apply(new MatchmakingEvent.MatchmakingMatchedEvent(
                 matchmakingId,
                 command.opponentId(),
-                command.gameId(),
+                command.roomId(),
                 command.vsBot(),
                 Instant.now()));
     }
@@ -128,23 +123,18 @@ public class MatchmakingAggregate {
     public void on(MatchmakingEvent.MatchmakingStartedEvent event) {
         this.matchmakingId = event.matchmakingId();
         this.playerId = event.playerId();
-        this.topicId = event.topicId();
-        this.level = event.level();
-        this.languages = event.languages();
         this.status = MatchmakingStatus.SEARCHING;
     }
 
     @EventSourcingHandler
     public void on(MatchmakingEvent.MatchmakingMatchedEvent event) {
-        this.status = MatchmakingStatus.CLOSED;
-        this.opponentId = event.opponentId();
-        this.gameId = event.gameId();
-        this.vsBot = event.vsBot();
+        this.status = MatchmakingStatus.COMPLETED;
+        this.roomId = event.roomId();
     }
 
     @EventSourcingHandler
     public void on(MatchmakingEvent.MatchmakingCancelledEvent event) {
-        this.status = MatchmakingStatus.CLOSED;
+        this.status = MatchmakingStatus.CANCELLED;
     }
 
     @EventSourcingHandler

@@ -17,7 +17,7 @@ public record Matchmaking(
         int level,
         Set<Language> languages,
         String opponentId,
-        String gameId,
+        String roomId,
         boolean vsBot,
         MatchmakingStatus status,
         Instant createdAt,

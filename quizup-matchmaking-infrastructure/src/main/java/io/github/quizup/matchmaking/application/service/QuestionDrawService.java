@@ -1,9 +1,10 @@
 package io.github.quizup.matchmaking.application.service;
 
-import io.github.quizup.game.domain.model.GameQuestion;
-import io.github.quizup.game.domain.model.GameQuestionChoice;
-import io.github.quizup.game.domain.model.GameQuestionContent;
 import io.github.quizup.game.domain.model.GameRules;
+import io.github.quizup.matchmaking.domain.model.DrawnQuestion;
+import io.github.quizup.matchmaking.domain.model.DrawnQuestionChoice;
+import io.github.quizup.matchmaking.domain.model.DrawnQuestionContent;
+import io.github.quizup.matchmaking.domain.port.out.QuestionDrawPort;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import io.github.quizup.microservice.core.infrastructure.axon.QueryResponseTypes;
 import io.github.quizup.theme.domain.model.Question;
@@ -21,14 +22,15 @@ import java.util.Set;
 import static java.util.Objects.isNull;
 
 /**
- * Prépare les questions d'une partie (tirage aléatoire strict dans toutes les langues demandées)
- * et les mappe vers le modèle du domaine game.
+ * Adaptateur sortant du port {@link QuestionDrawPort} : tirage aléatoire strict des questions
+ * approuvées (quizup-theme) et mapping vers le <b>modèle local</b> du domaine matchmaking
+ * (un {@code *-domain} ne dépend jamais d'un autre service).
  * <p>
- * Appelé par les sagas (fenêtre d'attente / appariement) et non par un handler de commande :
- * l'I/O inter-service ne doit jamais bloquer une action utilisateur.
+ * Appelé par la saga salle (fenêtre d'attente) et non par un handler de commande : l'I/O
+ * inter-service ne doit jamais bloquer une action utilisateur.
  */
 @Service
-public class QuestionDrawService {
+public class QuestionDrawService implements QuestionDrawPort {
 
     private final QueryGateway queryGateway;
 
@@ -36,55 +38,54 @@ public class QuestionDrawService {
         this.queryGateway = queryGateway;
     }
 
-    /** Tire {@link GameRules#TOTAL_ROUNDS} questions approuvées disponibles dans toutes les langues. */
-    public List<GameQuestion> draw(String topicId, Set<Language> languages) {
+    @Override
+    public List<DrawnQuestion> draw(String topicId, Set<Language> languages) {
         if (languages == null || languages.isEmpty()) {
             return List.of();
         }
         List<Question> questions = queryGateway.query(
-                new QuestionQuery.GetRandomApprovedQuestionsQuery(
-                        topicId, GameRules.TOTAL_ROUNDS, languages),
+                new QuestionQuery.GetRandomApprovedQuestionsQuery(topicId, GameRules.TOTAL_ROUNDS, languages),
                 QueryResponseTypes.multipleInstancesOf(Question.class)
         ).join();
-        return questions.stream().map(QuestionDrawService::toGameQuestion).toList();
+        return questions.stream().map(QuestionDrawService::toDrawnQuestion).toList();
     }
 
-    // ── Mapping theme → game (dupliqué par émetteur : un *-domain ne dépend jamais d'un autre service) ──
+    // ── Mapping theme → modèle local (dupliqué par émetteur : un *-domain ne dépend jamais d'un autre service) ──
 
-    private static GameQuestion toGameQuestion(Question question) {
-        Map<Language, GameQuestionContent> translations = new EnumMap<>(Language.class);
+    private static DrawnQuestion toDrawnQuestion(Question question) {
+        Map<Language, DrawnQuestionContent> translations = new EnumMap<>(Language.class);
         if (question.contents() != null) {
             for (Map.Entry<Language, QuestionContent> content : question.contents().entrySet()) {
-                translations.put(content.getKey(), toGameQuestionContent(content.getValue()));
+                translations.put(content.getKey(), toDrawnQuestionContent(content.getValue()));
             }
         }
-        return new GameQuestion(
+        return new DrawnQuestion(
                 question.questionId(),
                 translations,
                 question.imageUrl(),
                 question.difficulty() != null ? question.difficulty().name() : null,
-                toGameQuestionChoice(question.correctAnswer()));
+                toDrawnQuestionChoice(question.correctAnswer()));
     }
 
-    private static GameQuestionContent toGameQuestionContent(QuestionContent content) {
-        return new GameQuestionContent(content.text(), toGameQuestionChoices(content.answers()));
+    private static DrawnQuestionContent toDrawnQuestionContent(QuestionContent content) {
+        return new DrawnQuestionContent(content.text(), toDrawnQuestionChoices(content.answers()));
     }
 
-    private static GameQuestionChoice toGameQuestionChoice(QuestionChoice questionChoice) {
-        return isNull(questionChoice) ? null : GameQuestionChoice.valueOf(questionChoice.name());
+    private static DrawnQuestionChoice toDrawnQuestionChoice(QuestionChoice questionChoice) {
+        return isNull(questionChoice) ? null : DrawnQuestionChoice.valueOf(questionChoice.name());
     }
 
-    private static Map<GameQuestionChoice, String> toGameQuestionChoices(Map<QuestionChoice, String> questionChoices) {
-        Map<GameQuestionChoice, String> gameQuestionChoices = new EnumMap<>(GameQuestionChoice.class);
+    private static Map<DrawnQuestionChoice, String> toDrawnQuestionChoices(Map<QuestionChoice, String> questionChoices) {
+        Map<DrawnQuestionChoice, String> drawnChoices = new EnumMap<>(DrawnQuestionChoice.class);
         if (isNull(questionChoices) || questionChoices.isEmpty()) {
-            return gameQuestionChoices;
+            return drawnChoices;
         }
         for (Map.Entry<QuestionChoice, String> entry : questionChoices.entrySet()) {
-            GameQuestionChoice choice = toGameQuestionChoice(entry.getKey());
+            DrawnQuestionChoice choice = toDrawnQuestionChoice(entry.getKey());
             if (!isNull(choice)) {
-                gameQuestionChoices.put(choice, entry.getValue());
+                drawnChoices.put(choice, entry.getValue());
             }
         }
-        return gameQuestionChoices;
+        return drawnChoices;
     }
 }

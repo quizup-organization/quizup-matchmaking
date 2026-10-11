@@ -11,8 +11,6 @@ import java.util.Set;
 public record MatchmakingCandidate(
         String matchmakingId,
         String playerId,
-        String topicId,
-        int level,
         Set<Language> languages,
         Instant createdAt
 ) {

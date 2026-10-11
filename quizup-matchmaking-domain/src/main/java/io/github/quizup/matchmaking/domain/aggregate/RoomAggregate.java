@@ -19,13 +19,16 @@ import java.time.Instant;
 import static org.axonframework.modelling.command.AggregateLifecycle.apply;
 
 /**
- * RoomAggregate — salle temps réel entre deux humains.
+ * RoomAggregate — salle temps réel : deux humains (salle partagée ou appariement) ou un humain
+ * contre le bot.
  * <p>
  * Le créateur est l'initiateur ; le second humain devient participant lors de son
- * <b>apparition</b> dans la salle ({@code JoinRoomCommand}, émis par le client). Aucune saga ne
- * simule une action utilisateur, et aucun port externe n'est interrogé dans les handlers. Un état
- * terminal (partie créée, annulée, expirée, échouée) est purgé par la saga après rétention, puis
- * {@code markDeleted}.
+ * <b>apparition</b> dans la salle ({@code JoinRoomCommand}, émis par le client). Seule exception
+ * au client-driven : le bot, joint automatiquement par la saga quand la salle est {@code vsBot}.
+ * Aucune saga ne simule une action utilisateur, et aucun port externe n'est interrogé dans les
+ * handlers. Le statut suit l'avancement de la préparation ({@link RoomStatus}) ; une préparation
+ * engagée ne peut plus être quittée, mais l'initiateur peut toujours annuler. Un état terminal est
+ * purgé par la saga après rétention, puis {@code markDeleted}.
  */
 @Aggregate
 public class RoomAggregate {
@@ -34,7 +37,6 @@ public class RoomAggregate {
 
     @AggregateIdentifier
     private String roomId;
-    private String topicId;
     private String initiatorId;
     private String opponentId;
     private String participantId;
@@ -46,22 +48,25 @@ public class RoomAggregate {
     }
 
     /**
-     * Ouvre une salle. Si {@code opponentId} est renseigné, c'est une salle de défi nominatif :
-     * seul cet invité pourra apparaître comme second participant.
+     * Ouvre une salle. Si {@code opponentId} est renseigné, c'est une salle nominative : seul cet
+     * invité pourra apparaître comme second participant. {@code vsBot} marque le second joueur
+     * comme bot (join automatique par la saga).
      */
     @CommandHandler
     public RoomAggregate(RoomCommand.CreateRoomCommand command) {
         requirePlayerId(command.initiatorId(), command.roomId());
         requireTopicId(command.topicId(), command.roomId());
 
-        logger.info("Creating room: roomId={}, topicId={}, initiatorId={}, opponentId={}",
-                command.roomId(), command.topicId(), command.initiatorId(), command.opponentId());
+        logger.info("Creating room: roomId={}, topicId={}, initiatorId={}, opponentId={}, vsBot={}",
+                command.roomId(), command.topicId(), command.initiatorId(), command.opponentId(), command.vsBot());
         Instant now = Instant.now();
         apply(new RoomEvent.RoomCreatedEvent(
                 command.roomId(),
                 command.topicId(),
                 command.initiatorId(),
                 command.opponentId(),
+                command.vsBot(),
+                command.botDifficulty(),
                 now.plus(RoomDeadline.ROOM_EXPIRY_DURATION),
                 now));
     }
@@ -69,7 +74,7 @@ public class RoomAggregate {
     /**
      * Apparition d'un joueur dans la salle : présence temps réel et, pour le second humain,
      * enregistrement implicite comme participant. Idempotent ; quand les deux sont présents, la
-     * salle déclenche le compte à rebours de lancement.
+     * salle passe en préparation ({@code FETCHING_PLAYERS}) et arme le compte à rebours.
      */
     @CommandHandler
     public void handle(RoomCommand.JoinRoomCommand command) {
@@ -102,9 +107,10 @@ public class RoomAggregate {
     }
 
     /**
-     * Sortie **non destructive** : le joueur quitte la salle mais le participant reste enregistré
-     * (retour possible jusqu'à l'expiration). La salle ne se ferme que par {@code CancelRoomCommand}
-     * (initiateur) ou expiration — jamais sur passage hors ligne.
+     * Sortie <b>non destructive</b> avant l'engagement : le joueur quitte la salle mais le
+     * participant reste enregistré (retour possible). Refusée dès que la préparation est lancée
+     * (les deux présents) — le duel est engagé. La salle ne se ferme que par
+     * {@code CancelRoomCommand} (initiateur) ou expiration.
      */
     @CommandHandler
     public void handle(RoomCommand.LeaveRoomCommand command) {
@@ -112,6 +118,9 @@ public class RoomAggregate {
             return;
         }
         requireParticipant(command.playerId());
+        if (status != RoomStatus.WAITING_PLAYERS) {
+            throw new RoomExceptions.RoomPreparationStartedProblem(roomId);
+        }
         boolean alreadyAbsent = command.playerId().equals(initiatorId)
                 ? !initiatorPresent
                 : !participantPresent;
@@ -121,6 +130,7 @@ public class RoomAggregate {
         apply(new RoomEvent.RoomLeftEvent(roomId, command.playerId(), Instant.now()));
     }
 
+    /** L'initiateur annule explicitement la salle, y compris pendant la préparation. */
     @CommandHandler
     public void handle(RoomCommand.CancelRoomCommand command) {
         if (isClosed()) {
@@ -132,10 +142,33 @@ public class RoomAggregate {
         apply(new RoomEvent.RoomCancelledEvent(roomId, initiatorId, "PLAYER_CANCELLED", Instant.now()));
     }
 
+    /** Commande interne (saga) : les profils sont résolus ; avance la préparation (monotone). */
+    @CommandHandler
+    public void handle(RoomCommand.MarkRoomPlayersLoadedCommand command) {
+        if (status != RoomStatus.FETCHING_PLAYERS) {
+            return;
+        }
+        logger.info("Players loaded in room: roomId={}", roomId);
+        apply(new RoomEvent.RoomPlayersLoadedEvent(roomId, Instant.now()));
+    }
+
+    /** Commande interne (saga) : les questions sont tirées ; avance la préparation (monotone). */
+    @CommandHandler
+    public void handle(RoomCommand.MarkRoomQuestionsLoadedCommand command) {
+        if (status != RoomStatus.FETCHING_QUESTIONS) {
+            return;
+        }
+        logger.info("Questions loaded in room: roomId={}", roomId);
+        apply(new RoomEvent.RoomQuestionsLoadedEvent(roomId, Instant.now()));
+    }
+
     /** Succès : la partie est créée ; la salle reste lisible jusqu'à sa purge par la saga. */
     @CommandHandler
     public void handle(RoomCommand.CompleteRoomCommand command) {
         requireGameId(command.gameId(), roomId);
+        if (isClosed()) {
+            return;
+        }
         // La partie n'est créée qu'une fois les deux joueurs réellement présents en salle.
         if (!bothPresent()) {
             throw new RoomExceptions.ParticipantNotPresentProblem(roomId);
@@ -202,7 +235,10 @@ public class RoomAggregate {
     }
 
     private boolean isClosed() {
-        return status == RoomStatus.CLOSED || status == RoomStatus.FAILED;
+        return status == RoomStatus.COMPLETED
+                || status == RoomStatus.CANCELLED
+                || status == RoomStatus.EXPIRED
+                || status == RoomStatus.FAILED;
     }
 
     // ============================ Event Sourcing ============================
@@ -210,10 +246,9 @@ public class RoomAggregate {
     @EventSourcingHandler
     public void on(RoomEvent.RoomCreatedEvent event) {
         this.roomId = event.roomId();
-        this.topicId = event.topicId();
         this.initiatorId = event.initiatorId();
         this.opponentId = event.opponentId();
-        this.status = RoomStatus.CREATED;
+        this.status = RoomStatus.WAITING_PLAYERS;
     }
 
     /**
@@ -236,7 +271,17 @@ public class RoomAggregate {
 
     @EventSourcingHandler
     public void on(RoomEvent.RoomAllPlayersPresentEvent event) {
-        // Événement de lancement : l'état des présences est déjà porté par les entrées.
+        this.status = RoomStatus.FETCHING_PLAYERS;
+    }
+
+    @EventSourcingHandler
+    public void on(RoomEvent.RoomPlayersLoadedEvent event) {
+        this.status = RoomStatus.FETCHING_QUESTIONS;
+    }
+
+    @EventSourcingHandler
+    public void on(RoomEvent.RoomQuestionsLoadedEvent event) {
+        this.status = RoomStatus.CREATING_GAME;
     }
 
     @EventSourcingHandler
@@ -251,12 +296,12 @@ public class RoomAggregate {
 
     @EventSourcingHandler
     public void on(RoomEvent.RoomCancelledEvent event) {
-        this.status = RoomStatus.CLOSED;
+        this.status = RoomStatus.CANCELLED;
     }
 
     @EventSourcingHandler
     public void on(RoomEvent.RoomCompletedEvent event) {
-        this.status = RoomStatus.CLOSED;
+        this.status = RoomStatus.COMPLETED;
     }
 
     @EventSourcingHandler
@@ -266,7 +311,7 @@ public class RoomAggregate {
 
     @EventSourcingHandler
     public void on(RoomEvent.RoomExpiredEvent event) {
-        this.status = RoomStatus.CLOSED;
+        this.status = RoomStatus.EXPIRED;
     }
 
     @EventSourcingHandler

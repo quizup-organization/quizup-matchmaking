@@ -3,26 +3,35 @@ package io.github.quizup.matchmaking.domain.command;
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
 /**
- * Commandes de la salle (deux humains). L'identifiant de l'agrégat sert de référence de
- * partage : le lien est {@code /join/{roomId}}.
+ * Commandes de la salle : deux humains (salle partagée ou appariement) ou un humain contre le
+ * bot. L'identifiant de l'agrégat sert de référence de partage : le lien est {@code /join/{roomId}}.
  */
 public interface RoomCommand {
 
     String roomId();
 
-    /** Ouvre une salle ; le créateur en est l'initiateur. Nominatif si {@code opponentId} renseigné. */
+    /**
+     * Ouvre une salle ; le créateur en est l'initiateur. Nominatif si {@code opponentId} est
+     * renseigné (défi, appariement) ; {@code vsBot} marque une salle dont le second joueur est le
+     * bot (join automatique par la saga). {@code botDifficulty} est le nom de l'enum game
+     * (nullable, défaut NORMAL) — porté en {@code String} pour que le domaine matchmaking ne
+     * dépende jamais du domaine game.
+     */
     record CreateRoomCommand(
             @TargetAggregateIdentifier String roomId,
             String topicId,
             String initiatorId,
-            String opponentId
+            String opponentId,
+            boolean vsBot,
+            String botDifficulty
     ) implements RoomCommand {
     }
 
     /**
      * Le joueur <b>apparaît</b> dans la salle : présence temps réel et, pour le second humain,
      * enregistrement implicite comme participant. Commande unique — le client l'émet quand
-     * l'utilisateur est réellement dans la salle ; aucune saga ne le fait à sa place.
+     * l'utilisateur est réellement dans la salle ; aucune saga ne le fait à sa place (seule
+     * exception : le join automatique du bot sur une salle {@code vsBot}).
      */
     record JoinRoomCommand(
             @TargetAggregateIdentifier String roomId,
@@ -32,7 +41,8 @@ public interface RoomCommand {
 
     /**
      * Sortie <b>non destructive</b> : le joueur quitte la salle mais reste participant ; il peut
-     * revenir jusqu'à l'expiration.
+     * revenir jusqu'à l'expiration. Autorisée uniquement tant que les deux joueurs ne sont pas
+     * présents ({@code WAITING_PLAYERS}) : une préparation engagée ne peut plus être quittée.
      */
     record LeaveRoomCommand(
             @TargetAggregateIdentifier String roomId,
@@ -40,10 +50,22 @@ public interface RoomCommand {
     ) implements RoomCommand {
     }
 
-    /** L'initiateur annule explicitement la salle. */
+    /** L'initiateur annule explicitement la salle (possible tant que la salle n'est pas terminale). */
     record CancelRoomCommand(
             @TargetAggregateIdentifier String roomId,
             String playerId
+    ) implements RoomCommand {
+    }
+
+    /** Commande interne (saga) : les profils des joueurs sont résolus. */
+    record MarkRoomPlayersLoadedCommand(
+            @TargetAggregateIdentifier String roomId
+    ) implements RoomCommand {
+    }
+
+    /** Commande interne (saga) : les questions sont tirées, la création de la partie peut démarrer. */
+    record MarkRoomQuestionsLoadedCommand(
+            @TargetAggregateIdentifier String roomId
     ) implements RoomCommand {
     }
 

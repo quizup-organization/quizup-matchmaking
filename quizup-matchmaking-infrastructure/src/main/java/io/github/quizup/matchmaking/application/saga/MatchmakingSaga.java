@@ -1,18 +1,11 @@
 package io.github.quizup.matchmaking.application.saga;
 
-import io.github.quizup.game.domain.command.GameCommand;
-import io.github.quizup.game.domain.model.GamePlayerType;
-import io.github.quizup.game.domain.model.GameQuestion;
-import io.github.quizup.game.domain.model.GameRules;
-import io.github.quizup.game.domain.model.PlayerProgressSnapshot;
-import io.github.quizup.matchmaking.application.service.QuestionDrawService;
 import io.github.quizup.matchmaking.domain.command.MatchmakingCommand;
+import io.github.quizup.matchmaking.domain.command.RoomCommand;
 import io.github.quizup.matchmaking.domain.event.MatchmakingEvent;
 import io.github.quizup.matchmaking.domain.model.MatchmakingCandidate;
 import io.github.quizup.matchmaking.domain.model.MatchmakingDeadline;
 import io.github.quizup.matchmaking.domain.model.MatchmakingRules;
-import io.github.quizup.matchmaking.domain.model.PlayerSummary;
-import io.github.quizup.matchmaking.domain.port.out.MatchmakingPlayerPort;
 import io.github.quizup.matchmaking.domain.port.out.MatchmakingPoolPort;
 import io.github.quizup.matchmaking.domain.port.out.TopicAvailabilityPort;
 import io.github.quizup.microservice.core.domain.constant.QuizUpConstants;
@@ -40,10 +33,11 @@ import java.util.UUID;
 /**
  * Orchestration de l'appariement public (« Défier le monde »).
  * <p>
- * Le dernier arrivé initie le pairage : il cherche un candidat plus ancien, compatible
- * (même sujet, niveau ±{@code LEVEL_WINDOW}, langues couvertes par le sujet), le réclame
- * atomiquement, <b>prépare les questions</b> puis crée la partie et marque les deux recherches
- * comme appariées. À l'échéance (5 s) sans adversaire, il crée une partie bot.
+ * Le dernier arrivé initie le pairage : il cherche un candidat plus ancien, compatible (même
+ * sujet, niveau ±{@code LEVEL_WINDOW}, langues couvertes par le sujet) puis crée la <b>salle</b>
+ * et marque les deux recherches comme appariées. À l'échéance (5 s) sans adversaire, il crée une
+ * salle contre le bot (dont le join est exécuté par la saga salle). Le matchmaking ne prépare
+ * jamais la partie : la salle est l'unique point d'entrée de préparation.
  */
 @Saga
 @ProcessingGroup("matchmaking-saga")
@@ -62,13 +56,7 @@ public class MatchmakingSaga {
     private transient MatchmakingPoolPort pool;
 
     @Autowired
-    private transient MatchmakingPlayerPort playerPort;
-
-    @Autowired
     private transient TopicAvailabilityPort topicAvailabilityPort;
-
-    @Autowired
-    private transient QuestionDrawService questionDrawService;
 
     @Getter
     @Setter
@@ -85,10 +73,6 @@ public class MatchmakingSaga {
     @Getter
     @Setter
     private int level;
-
-    @Getter
-    @Setter
-    private Set<Language> languages;
 
     @Getter
     @Setter
@@ -114,7 +98,6 @@ public class MatchmakingSaga {
         this.topicId = event.topicId();
         this.level = event.level();
         this.startedAt = event.startedAt();
-        this.languages = event.languages();
 
         this.deadlineId = deadlineManager.schedule(
                 MatchmakingDeadline.MATCHMAKING_DEADLINE_DURATION,
@@ -123,7 +106,7 @@ public class MatchmakingSaga {
         tryMatch(event.languages());
     }
 
-    /** Tente d'apparier avec un candidat plus ancien et compatible. */
+    /** Tente d'apparier avec un candidat plus ancien et compatible (vérification du sujet n°1). */
     private void tryMatch(Set<Language> myLanguages) {
         List<MatchmakingCandidate> candidates =
                 pool.candidates(topicId, level, MatchmakingRules.LEVEL_WINDOW, playerId, CANDIDATE_LIMIT);
@@ -139,48 +122,26 @@ public class MatchmakingSaga {
             if (pool.claim(candidate.matchmakingId(), playerId).isEmpty()) {
                 continue; // course : candidat déjà pris
             }
-            List<GameQuestion> questions = questionDrawService.draw(topicId, union);
-            if (questions.size() < GameRules.TOTAL_ROUNDS) {
-                logger.warn("Questions insuffisantes pour l'appariement {} / {} (topic={}, questions={})",
-                        matchmakingId, candidate.matchmakingId(), topicId, questions.size());
-                commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(
-                        matchmakingId, "TOPIC_NOT_AVAILABLE_IN_LANGUAGE"));
-                commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(
-                        candidate.matchmakingId(), "TOPIC_NOT_AVAILABLE_IN_LANGUAGE"));
-                this.finished = true;
-                return;
-            }
-            createHumanGame(candidate, questions);
+            createHumanRoom(candidate);
             return;
         }
     }
 
-    private void createHumanGame(MatchmakingCandidate candidate, List<GameQuestion> questions) {
-        String gameId = UUID.randomUUID().toString();
-        PlayerSummary me = playerPort.getPlayer(playerId);
-        PlayerSummary opponent = playerPort.getPlayer(candidate.playerId());
+    private void createHumanRoom(MatchmakingCandidate candidate) {
+        String roomId = UUID.randomUUID().toString();
         try {
-            commandGateway.sendAndWait(new GameCommand.CreateGameCommand(
-                    gameId,
-                    topicId,
-                    playerId,
-                    nameOf(me),
-                    candidate.playerId(),
-                    nameOf(opponent),
-                    GamePlayerType.HUMAN,
-                    null,
-                    new PlayerProgressSnapshot(me.level(), me.xpTotal()),
-                    new PlayerProgressSnapshot(opponent.level(), opponent.xpTotal()),
-                    questions));
+            commandGateway.sendAndWait(new RoomCommand.CreateRoomCommand(
+                    roomId, topicId, playerId, candidate.playerId(), false, null));
             commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
-                    matchmakingId, candidate.playerId(), gameId, false));
+                    matchmakingId, candidate.playerId(), roomId, false));
             commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
-                    candidate.matchmakingId(), playerId, gameId, false));
+                    candidate.matchmakingId(), playerId, roomId, false));
             this.finished = true;
         } catch (Exception exception) {
-            logger.error("Échec de création de partie pour l'appariement {} / {}", matchmakingId, candidate.matchmakingId(), exception);
-            commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(matchmakingId, "GAME_CREATION_FAILED"));
-            commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(candidate.matchmakingId(), "GAME_CREATION_FAILED"));
+            logger.error("Échec de création de la salle pour l'appariement {} / {}",
+                    matchmakingId, candidate.matchmakingId(), exception);
+            commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(matchmakingId, "ROOM_CREATION_FAILED"));
+            commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(candidate.matchmakingId(), "ROOM_CREATION_FAILED"));
             this.finished = true;
         }
     }
@@ -190,39 +151,19 @@ public class MatchmakingSaga {
         if (finished) {
             return;
         }
-        logger.info("Timeout matchmaking — partie bot: matchmakingId={}", matchmakingId);
-        String gameId = UUID.randomUUID().toString();
-        PlayerSummary me = playerPort.getPlayer(playerId);
-        Set<Language> ownLanguages = languages == null ? Set.of() : Set.copyOf(languages);
-        List<GameQuestion> questions = questionDrawService.draw(topicId, ownLanguages);
-        if (questions.size() < GameRules.TOTAL_ROUNDS) {
-            logger.warn("Questions insuffisantes pour la partie bot: matchmakingId={}, topic={}, questions={}",
-                    matchmakingId, topicId, questions.size());
-            commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(
-                    matchmakingId, "TOPIC_NOT_AVAILABLE_IN_LANGUAGE"));
-            this.finished = true;
-            return;
-        }
+        logger.info("Timeout matchmaking — salle bot: matchmakingId={}", matchmakingId);
+        String roomId = UUID.randomUUID().toString();
         try {
-            commandGateway.sendAndWait(new GameCommand.CreateGameCommand(
-                    gameId,
-                    topicId,
-                    playerId,
-                    nameOf(me),
-                    QuizUpConstants.SYSTEM_USER_ID,
-                    QuizUpConstants.SYSTEM_USER_NAME,
-                    GamePlayerType.BOT,
-                    null,
-                    new PlayerProgressSnapshot(me.level(), me.xpTotal()),
-                    PlayerProgressSnapshot.forBot(null),
-                    questions));
+            commandGateway.sendAndWait(new RoomCommand.CreateRoomCommand(
+                    roomId, topicId, playerId, QuizUpConstants.SYSTEM_USER_ID, true, null));
             commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
-                    matchmakingId, null, gameId, true));
+                    matchmakingId, null, roomId, true));
+            this.finished = true;
         } catch (Exception exception) {
-            logger.error("Échec de création de partie bot: matchmakingId={}", matchmakingId, exception);
-            commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(matchmakingId, "GAME_CREATION_FAILED"));
+            logger.error("Échec de création de la salle bot: matchmakingId={}", matchmakingId, exception);
+            commandGateway.send(new MatchmakingCommand.FailMatchmakingCommand(matchmakingId, "ROOM_CREATION_FAILED"));
+            this.finished = true;
         }
-        this.finished = true;
     }
 
     @SagaEventHandler(associationProperty = "matchmakingId")
@@ -286,9 +227,5 @@ public class MatchmakingSaga {
         if (left != null) union.addAll(left);
         if (right != null) union.addAll(right);
         return union;
-    }
-
-    private static String nameOf(PlayerSummary player) {
-        return player == null || player.pseudonym() == null ? "" : player.pseudonym();
     }
 }

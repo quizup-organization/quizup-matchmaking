@@ -18,6 +18,6 @@ public interface RoomJpaRepository extends JpaRepository<RoomEntity, String> {
               and (r.initiatorId = :playerId or r.opponentId = :playerId)
             order by r.createdAt desc
             """)
-    List<RoomEntity> findCreatedByPlayerId(@Param("status") RoomStatus status,
-                                           @Param("playerId") String playerId);
+    List<RoomEntity> findByStatusAndPlayerId(@Param("status") RoomStatus status,
+                                             @Param("playerId") String playerId);
 }

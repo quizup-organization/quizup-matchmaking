@@ -9,6 +9,8 @@ import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.function.UnaryOperator;
+
 /**
  * Projection read-only de la salle. Tous les états terminaux (partie créée, annulée, expirée,
  * échouée) sont conservés le temps de la rétention, puis supprimés sur {@code RoomPurgedEvent}.
@@ -31,7 +33,8 @@ public class RoomProjection {
                 .topicId(event.topicId())
                 .initiatorId(event.initiatorId())
                 .opponentId(event.opponentId())
-                .status(RoomStatus.CREATED)
+                .vsBot(event.vsBot())
+                .status(RoomStatus.WAITING_PLAYERS)
                 .createdAt(event.createdAt())
                 .expiresAt(event.expiresAt())
                 .updatedAt(event.createdAt())
@@ -60,9 +63,27 @@ public class RoomProjection {
     @Transactional
     public void on(RoomEvent.RoomAllPlayersPresentEvent event) {
         update(event.roomId(), room -> room.toBuilder()
-                .allPresentAt(event.presentAt())
+                .status(RoomStatus.FETCHING_PLAYERS)
                 .readyDeadlineAt(event.readyDeadlineAt())
                 .updatedAt(event.presentAt())
+                .build());
+    }
+
+    @EventHandler
+    @Transactional
+    public void on(RoomEvent.RoomPlayersLoadedEvent event) {
+        update(event.roomId(), room -> room.toBuilder()
+                .status(RoomStatus.FETCHING_QUESTIONS)
+                .updatedAt(event.loadedAt())
+                .build());
+    }
+
+    @EventHandler
+    @Transactional
+    public void on(RoomEvent.RoomQuestionsLoadedEvent event) {
+        update(event.roomId(), room -> room.toBuilder()
+                .status(RoomStatus.CREATING_GAME)
+                .updatedAt(event.loadedAt())
                 .build());
     }
 
@@ -82,7 +103,7 @@ public class RoomProjection {
     @Transactional
     public void on(RoomEvent.RoomCancelledEvent event) {
         update(event.roomId(), room -> room.toBuilder()
-                .status(RoomStatus.CLOSED)
+                .status(RoomStatus.CANCELLED)
                 .updatedAt(event.cancelledAt())
                 .build());
     }
@@ -91,7 +112,7 @@ public class RoomProjection {
     @Transactional
     public void on(RoomEvent.RoomCompletedEvent event) {
         update(event.roomId(), room -> room.toBuilder()
-                .status(RoomStatus.CLOSED)
+                .status(RoomStatus.COMPLETED)
                 .gameId(event.gameId())
                 .updatedAt(event.completedAt())
                 .build());
@@ -110,7 +131,7 @@ public class RoomProjection {
     @Transactional
     public void on(RoomEvent.RoomExpiredEvent event) {
         update(event.roomId(), room -> room.toBuilder()
-                .status(RoomStatus.CLOSED)
+                .status(RoomStatus.EXPIRED)
                 .updatedAt(event.expiredAt())
                 .build());
     }
@@ -121,7 +142,7 @@ public class RoomProjection {
         roomRepositoryPort.deleteById(event.roomId());
     }
 
-    private void update(String roomId, java.util.function.UnaryOperator<Room> transform) {
+    private void update(String roomId, UnaryOperator<Room> transform) {
         roomRepositoryPort.findById(roomId).ifPresent(room ->
                 roomRepositoryPort.save(transform.apply(room)));
     }

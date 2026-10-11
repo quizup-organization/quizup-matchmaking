@@ -33,16 +33,23 @@ class MatchmakingAggregateTest {
     @Test
     void match_appliesMatchedEvent() {
         fixture.given(started())
-                .when(new MatchmakingCommand.MarkMatchmakingMatchedCommand(MM_ID, "opponent-1", "game-1", false))
+                .when(new MatchmakingCommand.MarkMatchmakingMatchedCommand(MM_ID, "opponent-1", "room-1", false))
                 .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
                         MatchmakingEvent.MatchmakingMatchedEvent.class,
-                        e -> "game-1".equals(((MatchmakingEvent.MatchmakingMatchedEvent) e).gameId())));
+                        e -> "room-1".equals(((MatchmakingEvent.MatchmakingMatchedEvent) e).roomId())));
     }
 
     @Test
-    void matchIsIdempotentForSameGame() {
+    void matchIsIdempotentForSameRoom() {
         fixture.given(started(), matched())
-                .when(new MatchmakingCommand.MarkMatchmakingMatchedCommand(MM_ID, "opponent-1", "game-1", false))
+                .when(new MatchmakingCommand.MarkMatchmakingMatchedCommand(MM_ID, "opponent-1", "room-1", false))
+                .expectNoEvents();
+    }
+
+    @Test
+    void cancelIsIgnoredAfterMatch() {
+        fixture.given(started(), matched())
+                .when(new MatchmakingCommand.CancelMatchmakingCommand(MM_ID, PLAYER))
                 .expectNoEvents();
     }
 
@@ -58,7 +65,7 @@ class MatchmakingAggregateTest {
     @Test
     void fail_appliesFailedEvent() {
         fixture.given(started())
-                .when(new MatchmakingCommand.FailMatchmakingCommand(MM_ID, "GAME_CREATION_FAILED"))
+                .when(new MatchmakingCommand.FailMatchmakingCommand(MM_ID, "ROOM_CREATION_FAILED"))
                 .expectEventsMatching(QuizUpAxonMatchers.hasPayloadMatching(
                         MatchmakingEvent.MatchmakingFailedEvent.class,
                         e -> ((MatchmakingEvent.MatchmakingFailedEvent) e).matchmakingId().equals(MM_ID)));
@@ -78,6 +85,6 @@ class MatchmakingAggregateTest {
 
     private static MatchmakingEvent.MatchmakingMatchedEvent matched() {
         return new MatchmakingEvent.MatchmakingMatchedEvent(
-                MM_ID, "opponent-1", "game-1", false, java.time.Instant.now());
+                MM_ID, "opponent-1", "room-1", false, java.time.Instant.now());
     }
 }

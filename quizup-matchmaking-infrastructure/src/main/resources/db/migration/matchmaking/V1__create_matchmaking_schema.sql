@@ -1,8 +1,10 @@
 -- V1: Schéma matchmaking — recherche d'appariement public + salle.
--- Tables : matchmaking_entry (pool + ticket produit), room_entry (salle deux humains).
--- Statuts réduits au cycle de vie : SEARCHING|CLOSED|FAILED (ticket), CREATED|CLOSED|FAILED
--- (salle). L'issue exacte est portée par l'événement terminal et la notification ; les états
--- terminaux sont purgés par la saga après rétention (deadline), puis markDeleted.
+-- Tables : matchmaking_entry (pool + ticket produit), room_entry (salle : deux humains ou humain/bot).
+-- Statuts : WAITING_PLAYERS|FETCHING_PLAYERS|FETCHING_QUESTIONS|CREATING_GAME|COMPLETED|CANCELLED|EXPIRED|FAILED
+-- (salle, avancement de la préparation) et SEARCHING|COMPLETED|CANCELLED|FAILED (ticket). L'issue exacte est
+-- portée par l'événement terminal et la notification ; les états terminaux sont purgés par la
+-- saga après rétention (deadline), puis markDeleted. La data est réinitialisée à chaque breaking
+-- change des contrats (pas de migrations de compatibilité).
 
 CREATE TABLE matchmaking_entry (
     matchmaking_id VARCHAR(255) NOT NULL,
@@ -11,7 +13,7 @@ CREATE TABLE matchmaking_entry (
     level          INTEGER      NOT NULL,
     languages      VARCHAR(64)  NOT NULL,   -- codes ISO 639-1 séparés par des virgules
     opponent_id    VARCHAR(255),
-    game_id        VARCHAR(255),
+    room_id        VARCHAR(255),            -- salle d'appariement créée par la saga
     vs_bot         BOOLEAN      NOT NULL DEFAULT FALSE,
     status         VARCHAR(20)  NOT NULL,   -- SEARCHING, CLOSED, FAILED
     claimed_by     VARCHAR(255),            -- réservation atomique du pool (le statut reste SEARCHING)
@@ -28,10 +30,11 @@ CREATE TABLE room_entry (
     room_id        VARCHAR(255) NOT NULL,
     topic_id       VARCHAR(255) NOT NULL,
     initiator_id   VARCHAR(255) NOT NULL,
-    opponent_id    VARCHAR(255),            -- défi nominatif : seul cet invité peut apparaître
-    participant_id VARCHAR(255),            -- enregistré à l'apparition du second humain
+    opponent_id    VARCHAR(255),            -- salle nominative : seul cet invité peut apparaître
+    participant_id VARCHAR(255),            -- enregistré à l'apparition du second joueur
     game_id        VARCHAR(255),
-    status         VARCHAR(20)  NOT NULL,   -- CREATED, CLOSED, FAILED
+    vs_bot         BOOLEAN      NOT NULL DEFAULT FALSE, -- second joueur = bot (join automatique)
+    status         VARCHAR(30)  NOT NULL,   -- WAITING_PLAYERS ... COMPLETED, CLOSED, FAILED
     created_at     TIMESTAMP    NOT NULL,
     expires_at     TIMESTAMP    NOT NULL,
     updated_at     TIMESTAMP    NOT NULL,
