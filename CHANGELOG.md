@@ -1,3 +1,13 @@
+## [7.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v6.0.0...v7.0.0) (2026-10-11)
+
+### ⚠ BREAKING CHANGES
+
+* **matchmaking:** contrats matchmaking (roomId, statuts, commandes/événements de salle) ; CreateGameCommand n'est plus émis par le matchmaking.
+
+### Features
+
+* **matchmaking:** l'appariement crée une salle, la salle prépare et crée la partie ([612cc3c](https://github.com/quizup-organization/quizup-matchmaking/commit/612cc3cf523b379023e57d3b26c8c843697e275f))
+
 ## [6.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v5.1.1...v6.0.0) (2026-10-10)
 
 ### ⚠ BREAKING CHANGES
