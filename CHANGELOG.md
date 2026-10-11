@@ -1,3 +1,9 @@
+## [9.2.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v9.1.0...v9.2.0) (2026-10-11)
+
+### Features
+
+* **matchmaking:** tirage filtré (jamais-jouées + difficulté déduite) et statut dédié ([9e380e8](https://github.com/quizup-organization/quizup-matchmaking/commit/9e380e80b161f54689a14ad2ba33c6b9c40ba24d))
+
 ## [9.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v9.0.1...v9.1.0) (2026-10-11)
 
 ### Features
