@@ -1,3 +1,14 @@
+## [10.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v9.2.0...v10.0.0) (2026-10-12)
+
+### ⚠ BREAKING CHANGES
+
+* **matchmaking:** contrats RoomCommand/RoomEvent/CreateMatchmakingCommand/
+MatchmakingStartedEvent modifiés (reset data matchmaking requis).
+
+### Features
+
+* **matchmaking:** sagas sans query.join (snapshots événementiels + préparation non bloquante) ([31d9e1a](https://github.com/quizup-organization/quizup-matchmaking/commit/31d9e1a2856277067721abd97fd69aee35e6a810))
+
 ## [9.2.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v9.1.0...v9.2.0) (2026-10-11)
 
 ### Features
