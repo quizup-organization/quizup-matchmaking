@@ -1,3 +1,9 @@
+## [10.3.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v10.2.0...v10.3.0) (2026-10-12)
+
+### Features
+
+* **console:** consume quizup-sdk 4.7.0 (lag, commandes en vol, snapshots, scheduled) ([06a870c](https://github.com/quizup-organization/quizup-matchmaking/commit/06a870c6ec7be0b66554393450d95d89cacf47ed))
+
 ## [10.2.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v10.1.0...v10.2.0) (2026-10-12)
 
 ### Features
