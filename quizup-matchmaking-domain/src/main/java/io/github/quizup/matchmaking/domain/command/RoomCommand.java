@@ -1,6 +1,11 @@
 package io.github.quizup.matchmaking.domain.command;
 
+import io.github.quizup.matchmaking.domain.model.DrawnQuestion;
+import io.github.quizup.matchmaking.domain.model.RoomPlayer;
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
+
+import java.util.List;
+import java.util.Set;
 
 /**
  * Commandes de la salle : deux humains (salle partagée ou appariement) ou un humain contre le
@@ -32,10 +37,13 @@ public interface RoomCommand {
      * enregistrement implicite comme participant. Commande unique — le client l'émet quand
      * l'utilisateur est réellement dans la salle ; aucune saga ne le fait à sa place (seule
      * exception : le join automatique du bot sur une salle {@code vsBot}).
+     * {@code player} est le snapshot préparé par la façade (profil + progression) : la salle ne
+     * fait aucune I/O pour résoudre les joueurs.
      */
     record JoinRoomCommand(
             @TargetAggregateIdentifier String roomId,
-            String playerId
+            String playerId,
+            RoomPlayer player
     ) implements RoomCommand {
     }
 
@@ -65,13 +73,15 @@ public interface RoomCommand {
 
     /** Commande interne (saga) : les questions déjà jouées par les joueurs sont résolues. */
     record MarkRoomPlayedQuestionsLoadedCommand(
-            @TargetAggregateIdentifier String roomId
+            @TargetAggregateIdentifier String roomId,
+            Set<String> playedQuestionIds
     ) implements RoomCommand {
     }
 
     /** Commande interne (saga) : les questions sont tirées, la création de la partie peut démarrer. */
     record MarkRoomQuestionsLoadedCommand(
-            @TargetAggregateIdentifier String roomId
+            @TargetAggregateIdentifier String roomId,
+            List<DrawnQuestion> questions
     ) implements RoomCommand {
     }
 

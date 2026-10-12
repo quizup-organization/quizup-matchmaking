@@ -1,5 +1,6 @@
 package io.github.quizup.matchmaking.domain.event;
 
+import io.github.quizup.matchmaking.domain.model.TopicLanguageCoverage;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 
 import java.time.Instant;
@@ -9,12 +10,14 @@ public interface MatchmakingEvent {
 
     String matchmakingId();
 
+    /** Le ticket porte sa photo de couverture linguistique : la saga compare localement. */
     record MatchmakingStartedEvent(
             String matchmakingId,
             String playerId,
             String topicId,
             int level,
             Set<Language> languages,
+            TopicLanguageCoverage topicCoverage,
             Instant startedAt,
             Instant deadlineAt
     ) implements MatchmakingEvent {

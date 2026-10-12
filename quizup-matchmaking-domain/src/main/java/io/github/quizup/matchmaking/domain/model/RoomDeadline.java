@@ -22,6 +22,13 @@ public interface RoomDeadline {
 
     Duration ROOM_GAME_CREATION_DURATION = Duration.ofSeconds(30);
 
+    /**
+     * Borne d'une étape de préparation asynchrone (profils déjà portés par les événements ;
+     * historique des questions et tirage résolus via des requêtes non bloquantes) : une réponse
+     * perdue fait échouer la salle au lieu de la laisser bloquée en {@code FETCHING_*}.
+     */
+    Duration ROOM_PREPARATION_STEP_TIMEOUT = Duration.ofSeconds(10);
+
     /** Rétention d'un état terminal (annulé/expiré/échoué) avant purge : le client lit l'état. */
     String ROOM_PURGE = "room-purge";
 

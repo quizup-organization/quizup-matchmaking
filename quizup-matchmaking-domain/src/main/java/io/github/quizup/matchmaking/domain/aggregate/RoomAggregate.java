@@ -73,7 +73,7 @@ public class RoomAggregate {
                 now.plus(RoomDeadline.ROOM_EXPIRY_DURATION),
                 now));
         if (command.vsBot()) {
-            apply(new RoomEvent.RoomEnteredEvent(command.roomId(), QuizUpConstants.SYSTEM_USER_ID, now));
+            apply(new RoomEvent.RoomEnteredEvent(command.roomId(), QuizUpConstants.SYSTEM_USER_ID, null, now));
         }
     }
 
@@ -103,7 +103,7 @@ public class RoomAggregate {
 
         Instant now = Instant.now();
         logger.info("Player entering room: roomId={}, playerId={}", roomId, command.playerId());
-        apply(new RoomEvent.RoomEnteredEvent(roomId, command.playerId(), now));
+        apply(new RoomEvent.RoomEnteredEvent(roomId, command.playerId(), command.player(), now));
         if (bothPresent()) {
             // La préparation démarre immédiatement ; la partie sera créée dès les questions
             // tirées (plus de compte à rebours de lancement).
@@ -164,7 +164,8 @@ public class RoomAggregate {
             return;
         }
         logger.info("Played questions loaded in room: roomId={}", roomId);
-        apply(new RoomEvent.RoomPlayedQuestionsLoadedEvent(roomId, Instant.now()));
+        apply(new RoomEvent.RoomPlayedQuestionsLoadedEvent(
+                roomId, command.playedQuestionIds(), Instant.now()));
     }
 
     /** Commande interne (saga) : les questions sont tirées ; la saga lance la création de la partie. */
@@ -174,7 +175,7 @@ public class RoomAggregate {
             return;
         }
         logger.info("Questions loaded in room: roomId={}, création de la partie", roomId);
-        apply(new RoomEvent.RoomQuestionsLoadedEvent(roomId, Instant.now()));
+        apply(new RoomEvent.RoomQuestionsLoadedEvent(roomId, command.questions(), Instant.now()));
     }
 
     /** Commande interne (saga) : le service game a accusé la création de la partie. */

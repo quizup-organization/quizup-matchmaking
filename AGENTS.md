@@ -19,7 +19,9 @@ Trois responsabilités **distinctes**, chacune avec son agrégat :
   sans adversaire, crée une **salle bot**. Le matchmaking **ne prépare jamais la partie** : il crée
   une salle (nominative ou bot) et marque les tickets. L'agrégat ne conserve que ce dont ses
   handlers ont besoin (identifiant, joueur, statut, salle) ; les critères d'appariement (sujet,
-  niveau, langues) et l'issue (adversaire, vsBot) vivent dans les événements (saga + pool + BFF).
+  niveau, langues), la **photo de couverture linguistique du sujet** (`TopicLanguageCoverage`,
+  préparée par la façade) et l'issue (adversaire, vsBot) vivent dans les événements (saga + pool
+  + BFF).
 - **Défi nominatif** (`ChallengeAggregate`) : intention **asynchrone** « A défie B » (TTL 1 h,
   accept/refuse/annule/expire), sans présence ni partie et **sans validation de faisabilité**
   (couverture linguistique, questions) : l'agrégat se limite aux invariants de la commande
@@ -28,11 +30,14 @@ Trois responsabilités **distinctes**, chacune avec son agrégat :
 - **Salle** (`RoomAggregate`) : deux humains (salle partagée ou appariement) **ou** un humain
   contre le bot, **apparition client-driven**. Le client émet `JoinRoomCommand` (commande unique)
   quand l'utilisateur est réellement dans la salle : elle porte la présence et, pour le second
-  joueur, l'enregistrement du participant. Seule exception système : le bot est présent **dès la
+  joueur, l'enregistrement du participant, **avec le snapshot de profil `RoomPlayer` préparé par la
+  façade** (le client ne le fournit jamais ; voir `command-preparation.md`). Seule exception
+  système : le bot est présent **dès la
   création** d'une salle `vsBot` (présence appliquée par l'agrégat, aucun join système). `RoomSaga`
   est le **seul créateur de partie** : elle
-  prépare la partie dès les deux joueurs présents (**vérification du thème n°2** : profils + tirage
-  des questions) et la **crée immédiatement en fin de préparation** (aucun compte à rebours de
+  prépare la partie dès les deux joueurs présents (**vérification du thème n°2** : profils portés
+  par les événements d'apparition + historique et tirage via des **requêtes non bloquantes**) et la
+  **crée immédiatement en fin de préparation** (aucun compte à rebours de
   lancement), avance le statut de préparation et, en cas d'échec, **annonce l'échec** aux
   joueurs présents (`RoomFailedEvent` → `ROOM_FAILED`). Un salon non lancé expire après **1 jour** ;
   tant que la préparation n'est pas engagée, une **sortie explicite est non destructive** (le
@@ -74,41 +79,51 @@ ses événements. Handlers de commande/requête, sagas et projections sont la se
 ([`command-preparation.md`](../../best-practices/.backend/command-preparation.md)). Les agrégats
 sont purs (validations `requireXxx` + `apply`) ; les I/O inter-services vivent dans les **sagas**
 (fenêtres d'attente) via des **ports sortants** (`domain/port/out`) à **types locaux** — jamais un
-service applicatif injecté, jamais un type d'un autre `*-domain`.
+service applicatif injecté, jamais un type d'un autre `*-domain` — et **jamais en bloquant** : les
+requêtes renvoient des `CompletableFuture` dont le callback envoie une commande
+([`anti-patterns.md`](../../best-practices/.backend/anti-patterns.md) § 1).
 
 ## 3. Commandes / queries (bus) et sagas
 
-- `MatchmakingCommand` : `CreateMatchmakingCommand`, `CancelMatchmakingCommand`,
+- `MatchmakingCommand` : `CreateMatchmakingCommand` (+ `TopicLanguageCoverage` préparée par la
+  façade), `CancelMatchmakingCommand`,
   `MarkMatchmakingMatchedCommand` (roomId), `FailMatchmakingCommand`, `PurgeMatchmakingCommand`.
 - `ChallengeCommand` : `CreateChallengeCommand`, `Accept/Decline/Cancel/Expire/Purge`.
-- `RoomCommand` : `CreateRoomCommand` (`vsBot`, `botDifficulty`), `JoinRoomCommand` (apparition),
+- `RoomCommand` : `CreateRoomCommand` (`vsBot`, `botDifficulty`), `JoinRoomCommand` (apparition,
+  + snapshot `RoomPlayer`),
   `LeaveRoomCommand` (refusée après engagement), `CancelRoomCommand` (toujours possible tant que
-  non terminale), `MarkRoomPlayersLoadedCommand`, `MarkRoomPlayedQuestionsLoadedCommand`,
-  `MarkRoomQuestionsLoadedCommand`, `MarkRoomGameCreatedCommand` (accusé du service game),
+  non terminale), `MarkRoomPlayersLoadedCommand`, `MarkRoomPlayedQuestionsLoadedCommand`
+  (+ `Set<String>` des questions jouées), `MarkRoomQuestionsLoadedCommand` (+ `List<DrawnQuestion>`),
+  `MarkRoomGameCreatedCommand` (accusé du service game),
   `CompleteRoomCommand`, `FailRoomCommand`, `ExpireRoomCommand`, `PurgeRoomCommand`.
-- `RoomEvent` : `RoomCreatedEvent` (`vsBot`, `botDifficulty`), `RoomEnteredEvent`,
-  `RoomAllPlayersPresentEvent`, `RoomPlayersLoadedEvent`, `RoomPlayedQuestionsLoadedEvent`,
-  `RoomQuestionsLoadedEvent`, `RoomGameCreatedEvent`, `RoomLeftEvent`, `RoomCancelledEvent`,
+- `MatchmakingEvent.MatchmakingStartedEvent` porte `TopicLanguageCoverage`.
+- `RoomEvent` : `RoomCreatedEvent` (`vsBot`, `botDifficulty`), `RoomEnteredEvent` (+ snapshot
+  `RoomPlayer`, `null` pour le bot), `RoomAllPlayersPresentEvent`, `RoomPlayersLoadedEvent`,
+  `RoomPlayedQuestionsLoadedEvent` (+ ids joués), `RoomQuestionsLoadedEvent` (+ `DrawnQuestion`),
+  `RoomGameCreatedEvent`, `RoomLeftEvent`, `RoomCancelledEvent`,
   `RoomCompletedEvent`, `RoomFailedEvent`, `RoomExpiredEvent`, `RoomPurgedEvent`.
 - `MatchmakingQuery`, `ChallengeQuery`, `RoomQuery` (`GetRoomById`, `GetMyOpenRooms`,
   `GetRoomEventsQuery`).
 
 ## 4. Dépendances inter-services
 
-| Port sortant              | Service cible     | Query Axon envoyée (QueryGateway)          |
+| Port sortant              | Service cible     | Query Axon envoyée (QueryGateway, **non bloquante**)          |
 |---------------------------|-------------------|--------------------------------------------|
-| `ProfileRepositoryPort`   | `quizup-profile`  | `ProfileQuery.GetProfileQuery` + `ProgressionQuery.GetProgressionQuery` |
-| `PlayedQuestionsPort`     | `quizup-game`     | `GameQuery.GetPlayedQuestionIdsQuery` (questions déjà jouées, adaptée en `Set<String>` local) |
-| `TopicAvailabilityPort`   | `quizup-theme`    | `QuestionQuery.CountApprovedQuestionsByTopicAndLanguagesQuery` |
-| `QuestionDrawPort`        | `quizup-theme`    | `QuestionQuery.GetRandomApprovedQuestionsQuery` (préférences jamais-jouées + difficulté cible, adaptée en `DrawnQuestion` local) |
+| `PlayedQuestionsPort`     | `quizup-game`     | `GameQuery.GetPlayedQuestionIdsQuery` (questions déjà jouées, adaptée en `Set<String>` local, renvoyée en `CompletableFuture`) |
+| `QuestionDrawPort`        | `quizup-theme`    | `QuestionQuery.GetRandomApprovedQuestionsQuery` (préférences jamais-jouées + difficulté cible, adaptée en `DrawnQuestion` local, renvoyée en `CompletableFuture`) |
 
-Implémentations : `application/service/PlayerService` (profil salle + progression),
-`PlayedQuestionsService` (historique des questions jouées, `Set<String>` local),
-`TopicAvailabilityService` (couverture des langues, filtre de candidats),
+Implémentations : `application/service/PlayedQuestionsService` (historique des questions jouées,
+`Set<String>` local, **sans `.join()`**),
 `QuestionDrawService` (adaptateur de `QuestionDrawPort` : tirage strict sur les langues avec
-préférences de tri best-effort + mapping `theme.Question → DrawnQuestion` local ; la traduction vers
-`game.GameQuestion` est faite par la saga émettrice elle-même, comme le préconise
+préférences de tri best-effort + mapping `theme.Question → DrawnQuestion` local, **sans `.join()`** ;
+la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-même, comme le préconise
 `command-preparation.md`).
+
+> **Aucun port bloquant dans une saga** : les profils sont portés par les événements d'apparition
+> (préparés par la façade), la couverture linguistique de l'appariement est portée par
+> `MatchmakingStartedEvent`, et les requêtes historique/tirage sont non bloquantes (callback →
+> commande → événement). Voir
+> [`anti-patterns.md`](../../best-practices/.backend/anti-patterns.md) § 1.
 
 **Ports sortants locaux** : `MatchmakingPoolPort`, `MatchmakingRepositoryPort`,
 `MatchmakingEventStorePort`, `RoomRepositoryPort`, `RoomEventStorePort`, `ChallengeRepositoryPort`.
@@ -126,36 +141,45 @@ préférences de tri best-effort + mapping `theme.Question → DrawnQuestion` lo
 
 ### Appariement public (`MatchmakingSaga`)
 
-- `MatchmakingStartedEvent` → porte `deadlineAt` (fin de recherche, repli bot) et planifie une
+- `MatchmakingStartedEvent` → porte `deadlineAt` (fin de recherche, repli bot) **et la photo de
+  couverture linguistique du sujet** (`TopicLanguageCoverage`, préparée par la façade) ; planifie une
   deadline **5 s** ; **le dernier arrivé** initie le
   pairage : `MatchmakingPoolPort.candidates` (même sujet, niveau ±5, plus anciens), filtre par
-  langues (`TopicAvailabilityPort`, **vérification du thème n°1**), `claim` atomique, puis
+  langues **local** (`topicCoverage.approvedCountFor(union) >= GameRules.TOTAL_ROUNDS`,
+  **vérification du thème n°1**, aucune query bloquante), `claim` atomique, puis
   `CreateRoomCommand` (salle nominative, opponentId = candidat) et `MarkMatchmakingMatchedCommand`
   des deux tickets.
 - Deadline atteinte sans adversaire → `CreateRoomCommand(vsBot=true, opponentId = SYSTEM_USER_ID)`
   (le bot est déjà présent dans la salle créée) + `MarkMatchmakingMatchedCommand(vsBot=true)`.
 - Création de salle **fire-and-forget** (`send`, comme `ChallengeSaga`) : la salle est l'unique
-  point d'échec (`RoomFailedEvent` → `ROOM_FAILED`). Les exceptions synchrones des ports (pool,
-  couverture du sujet) sont converties par l'`@ExceptionHandler` de la saga en
+  point d'échec (`RoomFailedEvent` → `ROOM_FAILED`). Les exceptions synchrones des ports (pool) sont
+  converties par l'`@ExceptionHandler` de la saga en
   `FailMatchmakingCommand(matchmakingId, "MATCHMAKING_ERROR")`.
 
 ### Salle (`RoomSaga`)
 
 - `RoomCreatedEvent` → expiration planifiée (**1 jour**). La présence du bot (`vsBot`) est portée
   par l'agrégat (événement d'apparition appliqué à la création) : aucun join système côté saga.
-- `RoomEnteredEvent` (apparition client) → mémorise le participant (non-initiateur).
-- `RoomAllPlayersPresentEvent` → étape **profils** ; `RoomPlayersLoadedEvent` → étape
+- `RoomEnteredEvent` (apparition client) → mémorise le participant **et les snapshots de profil
+  `RoomPlayer`** (préparés par la façade) : aucune I/O de la saga pour résoudre les joueurs.
+- `RoomAllPlayersPresentEvent` → les profils sont connus, simple avancement de statut
+  (`MarkRoomPlayersLoadedCommand`) ; `RoomPlayersLoadedEvent` → étape
   **historique des questions jouées** (`PlayedQuestionsPort`, quizup-game, joueurs humains
-  uniquement) ; `RoomPlayedQuestionsLoadedEvent` → étape **questions** : tirage filtré
-  (`QuestionDrawPort`) avec préférences jamais-jouées + difficulté cible déduite du niveau moyen
+  uniquement, **requête non bloquante**) ; `RoomPlayedQuestionsLoadedEvent` → étape **questions** :
+  tirage filtré
+  (`QuestionDrawPort`, **requête non bloquante**) avec préférences jamais-jouées + difficulté cible
+  déduite du niveau moyen
   des joueurs (`QuestionLevelRules` : ≤9 EASY, 10–19 MEDIUM, 20–39 HARD, ≥40 EXPERT) ; chaque étape
-  avance le statut de la salle. Questions insuffisantes → `FailRoomCommand` immédiat
+  avance le statut de la salle. Chaque callback envoie une commande (`Mark*` portant le résultat,
+  ou `FailRoomCommand`) — jamais de mutation de la saga depuis le callback ; timeout d'étape
+  (`ROOM_PREPARATION_STEP_TIMEOUT`, 10 s) → `FailRoomCommand("ROOM_PREPARATION_FAILED")`.
+  Questions insuffisantes → `FailRoomCommand` immédiat
   (`TOPIC_NOT_AVAILABLE_IN_LANGUAGE`).
 - `RoomQuestionsLoadedEvent` → la saga envoie `CreateGameCommand` en **fire-and-forget**
   (HUMAN/HUMAN ou HUMAN/BOT, commande assemblée par `GamePreparationService` — le mapping local →
   `game.GameQuestion` ne vit pas dans la saga) et s'associe au `gameId` ; `GameCreatedEvent` →
   `MarkRoomGameCreatedCommand` → `GAME_CREATED`, puis `CompleteRoomCommand`. Accusé absent sous
-  **30 s** → `FailRoomCommand("GAME_CREATION_TIMEOUT")` ; exceptions synchrones des ports →
+  **30 s** → `FailRoomCommand("GAME_CREATION_TIMEOUT")` ; exceptions synchrones (mapping, envoi) →
   `FailRoomCommand("ROOM_PREPARATION_FAILED")` (`@ExceptionHandler`).
 - `RoomLeftEvent` (sortie non destructive avant engagement) → la salle reste ouverte, le joueur
   peut revenir. L'agrégat refuse la sortie ensuite (`RoomPreparationStartedProblem`).

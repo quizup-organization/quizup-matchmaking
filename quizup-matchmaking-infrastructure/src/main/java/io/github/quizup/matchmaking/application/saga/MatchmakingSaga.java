@@ -1,13 +1,14 @@
 package io.github.quizup.matchmaking.application.saga;
 
+import io.github.quizup.game.domain.model.GameRules;
 import io.github.quizup.matchmaking.domain.command.MatchmakingCommand;
 import io.github.quizup.matchmaking.domain.command.RoomCommand;
 import io.github.quizup.matchmaking.domain.event.MatchmakingEvent;
 import io.github.quizup.matchmaking.domain.model.MatchmakingCandidate;
 import io.github.quizup.matchmaking.domain.model.MatchmakingDeadline;
 import io.github.quizup.matchmaking.domain.model.MatchmakingRules;
+import io.github.quizup.matchmaking.domain.model.TopicLanguageCoverage;
 import io.github.quizup.matchmaking.domain.port.out.MatchmakingPoolPort;
-import io.github.quizup.matchmaking.domain.port.out.TopicAvailabilityPort;
 import io.github.quizup.microservice.core.domain.constant.QuizUpConstants;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import lombok.Getter;
@@ -39,8 +40,10 @@ import java.util.UUID;
  * (fire-and-forget, comme le défi nominatif) et marque les deux recherches comme appariées. À
  * l'échéance (5 s) sans adversaire, il crée une salle contre le bot. Le matchmaking ne prépare
  * jamais la partie : la salle est l'unique point d'échec, annoncé aux joueurs présents par
- * {@code RoomSaga}. Les exceptions des ports (pool, couverture du sujet) font échouer les tickets
- * via {@link ExceptionHandler}.
+ * {@code RoomSaga}. La couverture linguistique du sujet est portée par
+ * {@link MatchmakingEvent.MatchmakingStartedEvent} (photo préparée par la façade) : la saga
+ * compare localement, sans query bloquante sur le thread du processor. Les exceptions des ports
+ * (pool) font échouer les tickets via {@link ExceptionHandler}.
  */
 @Saga
 @ProcessingGroup("matchmaking-saga")
@@ -58,9 +61,6 @@ public class MatchmakingSaga {
     @Autowired
     private transient MatchmakingPoolPort pool;
 
-    @Autowired
-    private transient TopicAvailabilityPort topicAvailabilityPort;
-
     @Getter
     @Setter
     private String matchmakingId;
@@ -76,6 +76,10 @@ public class MatchmakingSaga {
     @Getter
     @Setter
     private int level;
+
+    @Getter
+    @Setter
+    private TopicLanguageCoverage topicCoverage;
 
     @Getter
     @Setter
@@ -100,6 +104,7 @@ public class MatchmakingSaga {
         this.playerId = event.playerId();
         this.topicId = event.topicId();
         this.level = event.level();
+        this.topicCoverage = event.topicCoverage();
         this.startedAt = event.startedAt();
 
         this.deadlineId = deadlineManager.schedule(
@@ -109,7 +114,7 @@ public class MatchmakingSaga {
         tryMatch(event.languages());
     }
 
-    /** Tente d'apparier avec un candidat plus ancien et compatible (vérification du sujet n°1). */
+    /** Tente d'apparier avec un candidat plus ancien et compatible (couverture linguistique locale). */
     private void tryMatch(Set<Language> myLanguages) {
         List<MatchmakingCandidate> candidates =
                 pool.candidates(topicId, level, MatchmakingRules.LEVEL_WINDOW, playerId, CANDIDATE_LIMIT);
@@ -119,7 +124,8 @@ public class MatchmakingSaga {
                 continue; // seul le plus récent initie
             }
             Set<Language> union = union(myLanguages, candidate.languages());
-            if (!topicAvailabilityPort.coversAllLanguages(topicId, union)) {
+            if (topicCoverage == null
+                    || topicCoverage.approvedCountFor(union) < GameRules.TOTAL_ROUNDS) {
                 continue;
             }
             if (pool.claim(candidate.matchmakingId(), playerId).isEmpty()) {

@@ -1,5 +1,6 @@
 package io.github.quizup.matchmaking.domain.command;
 
+import io.github.quizup.matchmaking.domain.model.TopicLanguageCoverage;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
@@ -12,13 +13,18 @@ public interface MatchmakingCommand {
 
     String matchmakingId();
 
-    /** Démarre une recherche pour un sujet. */
+    /**
+     * Démarre une recherche pour un sujet. {@code topicCoverage} est préparée par la façade
+     * (query theme) : l'événement de démarrage est ainsi auto-suffisant et la saga n'interroge
+     * jamais theme en bloquant.
+     */
     record CreateMatchmakingCommand(
             @TargetAggregateIdentifier String matchmakingId,
             String playerId,
             String topicId,
             int level,
-            Set<Language> languages
+            Set<Language> languages,
+            TopicLanguageCoverage topicCoverage
     ) implements MatchmakingCommand {
     }
 

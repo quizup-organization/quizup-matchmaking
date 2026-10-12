@@ -20,6 +20,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import static java.util.Objects.isNull;
 
@@ -29,8 +30,10 @@ import static java.util.Objects.isNull;
  * du niveau des joueurs — et mapping vers le <b>modèle local</b> du domaine matchmaking
  * (un {@code *-domain} ne dépend jamais d'un autre service).
  * <p>
- * Appelé par la saga salle (fenêtre d'attente) et non par un handler de commande : l'I/O
- * inter-service ne doit jamais bloquer une action utilisateur.
+ * Requête <b>non bloquante</b> : jamais de {@code join()} ici — le résultat est renvoyé sous forme
+ * de {@link CompletableFuture} et la saga salle le ramène par commande/événement. Appelé par la
+ * saga salle (fenêtre d'attente) et non par un handler de commande : l'I/O inter-service ne doit
+ * jamais bloquer une action utilisateur.
  */
 @Service
 public class QuestionDrawService implements QuestionDrawPort {
@@ -42,24 +45,23 @@ public class QuestionDrawService implements QuestionDrawPort {
     }
 
     @Override
-    public List<DrawnQuestion> draw(String topicId, Set<Language> languages,
-                                    DrawnQuestionDifficulty target, Set<String> excludeQuestionIds) {
+    public CompletableFuture<List<DrawnQuestion>> draw(String topicId, Set<Language> languages,
+                                                       DrawnQuestionDifficulty target, Set<String> excludeQuestionIds) {
         if (languages == null || languages.isEmpty()) {
-            return List.of();
+            return CompletableFuture.completedFuture(List.of());
         }
         Set<QuestionDifficulty> difficulties = target == null
                 ? Set.of()
                 : Set.of(QuestionDifficulty.valueOf(target.name()));
-        List<Question> questions = queryGateway.query(
-                new QuestionQuery.GetRandomApprovedQuestionsQuery(
-                        topicId,
-                        GameRules.TOTAL_ROUNDS,
-                        languages,
-                        difficulties,
-                        excludeQuestionIds == null ? Set.of() : excludeQuestionIds),
-                QueryResponseTypes.multipleInstancesOf(Question.class)
-        ).join();
-        return questions.stream().map(QuestionDrawService::toDrawnQuestion).toList();
+        return queryGateway.query(
+                        new QuestionQuery.GetRandomApprovedQuestionsQuery(
+                                topicId,
+                                GameRules.TOTAL_ROUNDS,
+                                languages,
+                                difficulties,
+                                excludeQuestionIds == null ? Set.of() : excludeQuestionIds),
+                        QueryResponseTypes.multipleInstancesOf(Question.class))
+                .thenApply(questions -> questions.stream().map(QuestionDrawService::toDrawnQuestion).toList());
     }
 
     // ── Mapping theme → modèle local (dupliqué par émetteur : un *-domain ne dépend jamais d'un autre service) ──

@@ -3,10 +3,12 @@ package io.github.quizup.matchmaking.domain.aggregate;
 import io.github.quizup.axon.test.QuizUpAxonMatchers;
 import io.github.quizup.matchmaking.domain.command.MatchmakingCommand;
 import io.github.quizup.matchmaking.domain.event.MatchmakingEvent;
+import io.github.quizup.matchmaking.domain.model.TopicLanguageCoverage;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -18,16 +20,23 @@ class MatchmakingAggregateTest {
     private static final String PLAYER = "player-1";
     private static final String TOPIC = "topic-1";
 
+    private static final TopicLanguageCoverage COVERAGE = new TopicLanguageCoverage(List.of(
+            new TopicLanguageCoverage.LanguageCoverage(Set.of(Language.FR), 10),
+            new TopicLanguageCoverage.LanguageCoverage(Set.of(Language.EN), 8),
+            new TopicLanguageCoverage.LanguageCoverage(Set.of(Language.FR, Language.EN), 7)));
+
     private final AggregateTestFixture<MatchmakingAggregate> fixture =
             new AggregateTestFixture<>(MatchmakingAggregate.class);
 
     @Test
     void create_appliesStartedEvent() {
         fixture.givenNoPriorActivity()
-                .when(new MatchmakingCommand.CreateMatchmakingCommand(MM_ID, PLAYER, TOPIC, 10, Set.of(Language.FR)))
+                .when(new MatchmakingCommand.CreateMatchmakingCommand(
+                        MM_ID, PLAYER, TOPIC, 10, Set.of(Language.FR), COVERAGE))
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         MatchmakingEvent.MatchmakingStartedEvent.class,
-                        e -> ((MatchmakingEvent.MatchmakingStartedEvent) e).matchmakingId().equals(MM_ID)));
+                        e -> ((MatchmakingEvent.MatchmakingStartedEvent) e).matchmakingId().equals(MM_ID)
+                                && COVERAGE.equals(((MatchmakingEvent.MatchmakingStartedEvent) e).topicCoverage())));
     }
 
     @Test
@@ -81,7 +90,7 @@ class MatchmakingAggregateTest {
     private static MatchmakingEvent.MatchmakingStartedEvent started() {
         java.time.Instant now = java.time.Instant.now();
         return new MatchmakingEvent.MatchmakingStartedEvent(
-                MM_ID, PLAYER, TOPIC, 10, Set.of(Language.FR), now, now.plusSeconds(5));
+                MM_ID, PLAYER, TOPIC, 10, Set.of(Language.FR), COVERAGE, now, now.plusSeconds(5));
     }
 
     private static MatchmakingEvent.MatchmakingMatchedEvent matched() {

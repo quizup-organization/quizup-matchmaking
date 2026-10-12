@@ -11,7 +11,6 @@ import io.github.quizup.matchmaking.domain.model.QuestionLevelRules;
 import io.github.quizup.matchmaking.domain.model.RoomDeadline;
 import io.github.quizup.matchmaking.domain.model.RoomPlayer;
 import io.github.quizup.matchmaking.domain.port.out.PlayedQuestionsPort;
-import io.github.quizup.matchmaking.domain.port.out.ProfileRepositoryPort;
 import io.github.quizup.matchmaking.domain.port.out.QuestionDrawPort;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import lombok.Getter;
@@ -34,24 +33,26 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Orchestration de la salle temps réel — seul créateur de la partie (deux humains ou humain/bot).
  * <ul>
  *   <li>{@code RoomCreatedEvent} → expiration de la salle (1 jour). La présence du bot
  *       ({@code vsBot}) est appliquée par l'agrégat à la création (aucun join système côté saga).</li>
- *   <li>{@code RoomEnteredEvent} → mémorise le participant (apparition client-driven).</li>
- *   <li>{@code RoomAllPlayersPresentEvent} → étape <b>profils</b> ({@link ProfileRepositoryPort},
- *       bot exclu) ; {@code RoomPlayersLoadedEvent} → étape <b>historique des questions jouées</b>
- *       ({@link PlayedQuestionsPort}, quizup-game) ; {@code RoomPlayedQuestionsLoadedEvent} → étape
- *       <b>questions</b> ({@link QuestionDrawPort}, vérification du sujet n°2, préférences
- *       jamais-jouées + difficulté déduite du niveau) ; chaque étape avance le statut de la salle.
- *       Questions insuffisantes → échec immédiat de la salle.</li>
+ *   <li>{@code RoomEnteredEvent} → mémorise le participant <b>et son snapshot de profil</b>
+ *       (préparé par la façade et porté par l'événement : aucune I/O de la saga pour les profils).</li>
+ *   <li>{@code RoomAllPlayersPresentEvent} → les profils sont déjà connus, la saga avance le
+ *       statut ({@code MarkRoomPlayersLoadedCommand}) ; {@code RoomPlayersLoadedEvent} → étape
+ *       <b>historique des questions jouées</b> ({@link PlayedQuestionsPort}, non bloquant) ;
+ *       {@code RoomPlayedQuestionsLoadedEvent} → étape <b>questions</b> ({@link QuestionDrawPort},
+ *       non bloquant). Chaque résultat revient par commande → événement (jamais de {@code join()}
+ *       sur le thread du processor, jamais de mutation de la saga depuis un callback).</li>
  *   <li>{@code RoomQuestionsLoadedEvent} → envoi de {@code CreateGameCommand} (assemblé par
  *       {@link GamePreparationService}) en <b>fire-and-forget</b>, association sur {@code gameId}
  *       et deadline d'accusé ; {@code GameCreatedEvent} → {@code MarkRoomGameCreatedCommand} puis
- *       {@code RoomGameCreatedEvent} → {@code CompleteRoomCommand}. Accusé absent ou échec
- *       synchrone → {@code RoomFailedEvent} annoncé aux joueurs présents.</li>
+ *       {@code RoomGameCreatedEvent} → {@code CompleteRoomCommand}. Accusé absent, échec ou
+ *       timeout d'une étape → {@code RoomFailedEvent} annoncé aux joueurs présents.</li>
  *   <li>{@code RoomLeftEvent} (sortie non destructive avant engagement) → retour possible. La
  *       sortie est refusée par l'agrégat une fois la préparation
  *       engagée.</li>
@@ -69,9 +70,6 @@ public class RoomSaga {
 
     @Autowired
     private transient DeadlineManager deadlineManager;
-
-    @Autowired
-    private transient ProfileRepositoryPort profileRepositoryPort;
 
     @Autowired
     private transient QuestionDrawPort questionDrawPort;
@@ -153,23 +151,27 @@ public class RoomSaga {
                 RoomDeadline.ROOM_EXPIRY_DURATION.toHours(), roomId, vsBot);
     }
 
+    /**
+     * Apparition d'un joueur : mémorise son snapshot de profil (le bot n'en a pas). Le profil est
+     * préparé par la façade et porté par l'événement — la saga ne fait aucune I/O pour les profils.
+     */
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomEnteredEvent event) {
-        // Seul le participant humain est mémorisé (le bot n'a pas de profil à résoudre).
-        if (!vsBot && !event.playerId().equals(initiatorId)) {
-            this.participantId = event.playerId();
+        if (event.player() != null) {
+            if (event.playerId().equals(initiatorId)) {
+                this.initiatorProfile = event.player();
+            } else {
+                this.participantProfile = event.player();
+            }
         }
         logger.info("Apparition en salle: roomId={}, playerId={}", roomId, event.playerId());
     }
 
-    /**
-     * Les deux joueurs sont présents : étape 1, résolution des profils. L'étape 2 (questions)
-     * est déclenchée par {@link RoomEvent.RoomPlayersLoadedEvent} — un pas par événement.
-     */
+    /** Les deux joueurs sont présents : les profils sont déjà portés par les apparitions. */
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomAllPlayersPresentEvent event) {
-        logger.info("Les deux joueurs sont présents, résolution des profils: roomId={}", roomId);
-        loadPlayers();
+        logger.info("Les deux joueurs sont présents, profils résolus: roomId={}", roomId);
+        markPlayersLoaded();
     }
 
     /** Profils résolus : étape 2, résolution de l'historique des questions jouées (quizup-game). */
@@ -182,39 +184,54 @@ public class RoomSaga {
     /** Historique résolu : étape 3, tirage filtré des questions (vérification du sujet n°2). */
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomPlayedQuestionsLoadedEvent event) {
+        this.playedQuestionIds = event.playedQuestionIds();
         logger.info("Historique résolu, tirage des questions: roomId={}", roomId);
-        loadQuestions();
+        drawQuestions();
     }
 
     /** Fin de préparation (questions tirées) : la création de la partie est demandée (send). */
     @SagaEventHandler(associationProperty = "roomId")
     public void on(RoomEvent.RoomQuestionsLoadedEvent event) {
+        this.drawnQuestions = event.questions();
+        int drawnCount = drawnQuestions == null ? 0 : drawnQuestions.size();
+        if (drawnCount < GameRules.TOTAL_ROUNDS) {
+            logger.warn("Thème insuffisant dans les langues requises, échec de la salle: roomId={}, topicId={}, questions={}",
+                    roomId, topicId, drawnCount);
+            commandGateway.send(new RoomCommand.FailRoomCommand(roomId, "TOPIC_NOT_AVAILABLE_IN_LANGUAGE"));
+            return;
+        }
         logger.info("Préparation terminée, création de la partie: roomId={}", roomId);
         requestGameCreation();
     }
 
-    /** Étape profils : le bot n'a pas de profil à résoudre. */
-    private void loadPlayers() {
-        if (playersLoaded()) {
+    /** Étape profils : snapshot déjà porté par les apparitions, simple avancement de statut. */
+    private void markPlayersLoaded() {
+        if (!profilesLoaded()) {
             return;
         }
-        this.initiatorProfile = profileRepositoryPort.getById(initiatorId);
-        this.participantProfile = vsBot ? null : profileRepositoryPort.getById(participantId);
         commandGateway.send(new RoomCommand.MarkRoomPlayersLoadedCommand(roomId));
     }
 
-    private boolean playersLoaded() {
+    private boolean profilesLoaded() {
         return initiatorProfile != null && (vsBot || participantProfile != null);
     }
 
-    /** Étape historique : questions déjà jouées par les joueurs humains de la salle. */
+    /**
+     * Étape historique : requête <b>non bloquante</b>. Le résultat revient par commande → événement
+     * (la saga n'est jamais mutée depuis le callback) ; un échec ou un timeout fait échouer la
+     * salle au lieu de bloquer le processor.
+     */
     private void resolvePlayedQuestions() {
-        if (playedQuestionIds != null || !playersLoaded()) {
+        if (playedQuestionIds != null || !profilesLoaded()) {
             return;
         }
-        this.playedQuestionIds = playedQuestionsPort.findPlayedQuestionIds(
-                topicId, humanPlayerIds());
-        commandGateway.send(new RoomCommand.MarkRoomPlayedQuestionsLoadedCommand(roomId));
+        String currentRoomId = this.roomId;
+        CommandGateway currentGateway = this.commandGateway;
+        playedQuestionsPort.findPlayedQuestionIds(topicId, humanPlayerIds())
+                .orTimeout(RoomDeadline.ROOM_PREPARATION_STEP_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
+                .whenComplete((playedIds, failure) -> currentGateway.send(failure == null
+                        ? new RoomCommand.MarkRoomPlayedQuestionsLoadedCommand(currentRoomId, playedIds)
+                        : new RoomCommand.FailRoomCommand(currentRoomId, "ROOM_PREPARATION_FAILED")));
     }
 
     /** Joueurs humains de la salle (le bot n'a pas d'historique). */
@@ -227,27 +244,29 @@ public class RoomSaga {
         return playerIds;
     }
 
-    /** Étape questions : tirage filtré (jamais-jouées, difficulté déduite) — vérification du sujet n°2. */
-    private void loadQuestions() {
-        if (drawnQuestions != null || !playersLoaded()) {
+    /**
+     * Étape questions : tirage filtré (jamais-jouées, difficulté déduite) — requête non bloquante,
+     * même contrat que l'étape historique.
+     */
+    private void drawQuestions() {
+        if (drawnQuestions != null || !profilesLoaded()) {
             return;
         }
         DrawnQuestionDifficulty target = QuestionLevelRules.targetFor(
                 initiatorProfile.level(),
                 participantProfile == null ? null : participantProfile.level());
-        List<DrawnQuestion> drawn = questionDrawPort.draw(
-                topicId,
-                languagesOf(initiatorProfile, participantProfile),
-                target,
-                playedQuestionIds == null ? Set.of() : playedQuestionIds);
-        if (drawn.size() < GameRules.TOTAL_ROUNDS) {
-            logger.warn("Thème insuffisant dans les langues requises, échec de la salle: roomId={}, topicId={}, questions={}",
-                    roomId, topicId, drawn.size());
-            commandGateway.send(new RoomCommand.FailRoomCommand(roomId, "TOPIC_NOT_AVAILABLE_IN_LANGUAGE"));
-            return;
-        }
-        this.drawnQuestions = drawn;
-        commandGateway.send(new RoomCommand.MarkRoomQuestionsLoadedCommand(roomId));
+        Set<String> excluded = playedQuestionIds == null ? Set.of() : playedQuestionIds;
+        String currentRoomId = this.roomId;
+        CommandGateway currentGateway = this.commandGateway;
+        questionDrawPort.draw(
+                        topicId,
+                        languagesOf(initiatorProfile, participantProfile),
+                        target,
+                        excluded)
+                .orTimeout(RoomDeadline.ROOM_PREPARATION_STEP_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
+                .whenComplete((questions, failure) -> currentGateway.send(failure == null
+                        ? new RoomCommand.MarkRoomQuestionsLoadedCommand(currentRoomId, questions)
+                        : new RoomCommand.FailRoomCommand(currentRoomId, "ROOM_PREPARATION_FAILED")));
     }
 
     /**
@@ -268,7 +287,7 @@ public class RoomSaga {
      */
     private void requestGameCreation() {
         if (gameId != null
-                || !playersLoaded()
+                || !profilesLoaded()
                 || drawnQuestions == null
                 || drawnQuestions.size() < GameRules.TOTAL_ROUNDS) {
             return;
@@ -306,9 +325,9 @@ public class RoomSaga {
     }
 
     /**
-     * Échec synchrone d'un handler de la saga (profils, tirage, mapping) : la salle échoue au lieu
-     * de bloquer le processor. Les échecs asynchrones des commandes {@code send} ne passent pas ici
-     * (créations d'agrégats pures ; accusé manquant couvert par la deadline).
+     * Échec synchrone d'un handler de la saga (mapping, envoi de commande) : la salle échoue au lieu
+     * de bloquer le processor. Les échecs asynchrones des requêtes non bloquantes sont convertis
+     * par le callback de chaque étape ({@code ROOM_PREPARATION_FAILED}).
      */
     @ExceptionHandler
     public void on(Exception exception) {

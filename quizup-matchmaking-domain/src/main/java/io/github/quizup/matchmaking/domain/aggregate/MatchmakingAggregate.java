@@ -54,6 +54,7 @@ public class MatchmakingAggregate {
                 command.topicId(),
                 command.level(),
                 command.languages(),
+                command.topicCoverage(),
                 now,
                 now.plus(MatchmakingDeadline.MATCHMAKING_DEADLINE_DURATION)));
     }

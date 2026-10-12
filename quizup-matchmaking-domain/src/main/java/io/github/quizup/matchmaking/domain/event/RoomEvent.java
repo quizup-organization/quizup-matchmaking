@@ -1,10 +1,17 @@
 package io.github.quizup.matchmaking.domain.event;
 
+import io.github.quizup.matchmaking.domain.model.DrawnQuestion;
+import io.github.quizup.matchmaking.domain.model.RoomPlayer;
+
 import java.time.Instant;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Événements de la salle temps réel. L'apparition d'un joueur ({@link RoomEnteredEvent}) porte
- * à la fois la présence et, au premier passage du second humain, l'enregistrement du participant.
+ * à la fois la présence, l'enregistrement du second humain et son snapshot de profil préparé par
+ * la façade (aucune I/O dans la saga). Les étapes de préparation asynchrones portent leur
+ * résultat pour que la saga le mémorise sans relire un read model.
  */
 public interface RoomEvent {
 
@@ -22,10 +29,14 @@ public interface RoomEvent {
     ) implements RoomEvent {
     }
 
-    /** Un joueur apparaît dans la salle (présence temps réel, idempotent). */
+    /**
+     * Un joueur apparaît dans la salle (présence temps réel, idempotent). {@code player} est
+     * {@code null} pour le bot (présence système, aucun profil à résoudre).
+     */
     record RoomEnteredEvent(
             String roomId,
             String playerId,
+            RoomPlayer player,
             Instant enteredAt
     ) implements RoomEvent {
     }
@@ -57,6 +68,7 @@ public interface RoomEvent {
      */
     record RoomPlayedQuestionsLoadedEvent(
             String roomId,
+            Set<String> playedQuestionIds,
             Instant loadedAt
     ) implements RoomEvent {
     }
@@ -67,6 +79,7 @@ public interface RoomEvent {
      */
     record RoomQuestionsLoadedEvent(
             String roomId,
+            List<DrawnQuestion> questions,
             Instant loadedAt
     ) implements RoomEvent {
     }
