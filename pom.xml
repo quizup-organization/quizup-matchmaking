@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.quizup</groupId>
         <artifactId>quizup-parent</artifactId>
-        <version>4.5.2</version>
+        <version>4.6.0</version>
         <relativePath/>
     </parent>
 
