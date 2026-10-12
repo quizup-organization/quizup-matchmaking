@@ -1,3 +1,9 @@
+## [10.2.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v10.1.0...v10.2.0) (2026-10-12)
+
+### Features
+
+* **console:** consume quizup-sdk 4.6.0 (build-info + API interne event store/scheduled) ([f1e910a](https://github.com/quizup-organization/quizup-matchmaking/commit/f1e910a68e83ce6c1922c2f2cfee344a8f7f91a1))
+
 ## [10.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v10.0.0...v10.1.0) (2026-10-12)
 
 ### Features
