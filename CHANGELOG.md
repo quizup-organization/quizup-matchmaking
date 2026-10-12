@@ -1,3 +1,9 @@
+## [10.3.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v10.3.0...v10.3.1) (2026-10-12)
+
+### Bug Fixes
+
+* **matchmaking:** contrats game 8.3.0 / profile 3.4.0 / theme 5.4.0 (élagués) ([cd3d6d7](https://github.com/quizup-organization/quizup-matchmaking/commit/cd3d6d7cf55e38e92f0840ed4a222de8bdc572a0))
+
 ## [10.3.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v10.2.0...v10.3.0) (2026-10-12)
 
 ### Features
