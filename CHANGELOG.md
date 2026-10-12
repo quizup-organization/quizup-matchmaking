@@ -1,3 +1,9 @@
+## [10.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v10.0.0...v10.1.0) (2026-10-12)
+
+### Features
+
+* **console:** consume quizup-sdk 4.5.2 (DLQ Axon par défaut + agent console) ([772ad83](https://github.com/quizup-organization/quizup-matchmaking/commit/772ad830189f62fe0678a373d4895eb39bdd1114))
+
 ## [10.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v9.2.0...v10.0.0) (2026-10-12)
 
 ### ⚠ BREAKING CHANGES
