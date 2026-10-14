@@ -15,8 +15,10 @@
 Trois responsabilités **distinctes**, chacune avec son agrégat :
 
 - **Appariement public** (`MatchmakingAggregate`) : trouve un adversaire pour un sujet
-  (même thème, niveau ±5, langues **en union** couvertes par le thème) ; à l'échéance de **5 s**
-  sans adversaire, crée une **salle bot**. Le matchmaking **ne prépare jamais la partie** : il crée
+  (même thème, niveau ±5, langues **en union** couvertes par le thème) ; à l'échéance de **10 s**
+  sans adversaire, crée une **salle d'entraînement** (bot) — duel **sans XP** (la progression ne
+  vient que des duels entre joueurs, cf. `quizup-profile`). Le matchmaking **ne prépare jamais la
+  partie** : il crée
   une salle (nominative ou bot) et marque les tickets. L'agrégat ne conserve que ce dont ses
   handlers ont besoin (identifiant, joueur, statut, salle) ; les critères d'appariement (sujet,
   niveau, langues), la **photo de couverture linguistique du sujet** (`TopicLanguageCoverage`,
@@ -141,9 +143,10 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
 
 ### Appariement public (`MatchmakingSaga`)
 
-- `MatchmakingStartedEvent` → porte `deadlineAt` (fin de recherche, repli bot) **et la photo de
-  couverture linguistique du sujet** (`TopicLanguageCoverage`, préparée par la façade) ; planifie une
-  deadline **5 s** ; **le dernier arrivé** initie le
+- `MatchmakingStartedEvent` → porte `deadlineAt` (fin de recherche, bascule sur
+  l'entraînement) **et la photo de couverture linguistique du sujet**
+  (`TopicLanguageCoverage`, préparée par la façade) ; planifie une deadline **10 s** ;
+  **le dernier arrivé** initie le
   pairage : `MatchmakingPoolPort.candidates` (même sujet, niveau ±5, plus anciens), filtre par
   langues **local** (`topicCoverage.approvedCountFor(union) >= GameRules.TOTAL_ROUNDS`,
   **vérification du thème n°1**, aucune query bloquante), `claim` atomique, puis

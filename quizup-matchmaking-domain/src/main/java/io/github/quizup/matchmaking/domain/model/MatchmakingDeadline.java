@@ -7,10 +7,14 @@ import java.time.Duration;
  */
 public interface MatchmakingDeadline {
 
-    /** Recherche d'un adversaire humain avant bascule sur une partie bot. */
+    /**
+     * Recherche d'un adversaire humain avant bascule sur une partie d'**entraînement** (bot).
+     * 10 s : la partie qui suit n'attribue aucune XP, on laisse donc au joueur le temps de
+     * trouver un adversaire réel (c'est la seule voie de progression).
+     */
     String MATCHMAKING_DEADLINE = "matchmaking-deadline";
 
-    Duration MATCHMAKING_DEADLINE_DURATION = Duration.ofSeconds(5);
+    Duration MATCHMAKING_DEADLINE_DURATION = Duration.ofSeconds(10);
 
     /** Rétention d'un ticket d'appariement terminal avant purge (read model). */
     String MATCHMAKING_PURGE = "matchmaking-purge";
