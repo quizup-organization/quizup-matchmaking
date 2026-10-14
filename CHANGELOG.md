@@ -1,3 +1,9 @@
+## [10.4.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v10.3.1...v10.4.0) (2026-10-14)
+
+### Features
+
+* **matchmaking:** bascule sur l'entraînement après 10 s de recherche ([ccc4f61](https://github.com/quizup-organization/quizup-matchmaking/commit/ccc4f61fc623e03c756784ece2b57c90e3812c71))
+
 ## [10.3.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v10.3.0...v10.3.1) (2026-10-12)
 
 ### Bug Fixes
