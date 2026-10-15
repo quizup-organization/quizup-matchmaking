@@ -1,3 +1,9 @@
+## [11.0.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.0.0...v11.0.1) (2026-10-15)
+
+### Bug Fixes
+
+* **matchmaking:** restaure V1 (checksum Flyway) — commentaires déplacés dans l'AGENTS ([45469eb](https://github.com/quizup-organization/quizup-matchmaking/commit/45469eb8a681776afa285be3849c4eab09a9771f))
+
 ## [11.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v10.4.0...v11.0.0) (2026-10-15)
 
 ### ⚠ BREAKING CHANGES
