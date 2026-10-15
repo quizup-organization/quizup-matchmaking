@@ -23,6 +23,13 @@ public interface MatchmakingEvent {
     ) implements MatchmakingEvent {
     }
 
+    /** Fenêtre de recherche écoulée sans adversaire : le ticket s'arrête (aucun repli bot). */
+    record MatchmakingExpiredEvent(
+            String matchmakingId,
+            Instant expiredAt
+    ) implements MatchmakingEvent {
+    }
+
     record MatchmakingMatchedEvent(
             String matchmakingId,
             String opponentId,

@@ -1,7 +1,7 @@
 -- V1: Schéma matchmaking — recherche d'appariement public + salle.
 -- Tables : matchmaking_entry (pool + ticket produit), room_entry (salle : deux humains ou humain/bot).
 -- Statuts : WAITING_PLAYERS|FETCHING_PLAYERS|FETCHING_QUESTIONS|CREATING_GAME|COMPLETED|CANCELLED|EXPIRED|FAILED
--- (salle, avancement de la préparation) et SEARCHING|COMPLETED|CANCELLED|FAILED (ticket). L'issue exacte est
+-- (salle, avancement de la préparation) et SEARCHING|COMPLETED|CANCELLED|EXPIRED|FAILED (ticket). L'issue exacte est
 -- portée par l'événement terminal et la notification ; les états terminaux sont purgés par la
 -- saga après rétention (deadline), puis markDeleted. La data est réinitialisée à chaque breaking
 -- change des contrats (pas de migrations de compatibilité).
@@ -15,10 +15,10 @@ CREATE TABLE matchmaking_entry (
     opponent_id    VARCHAR(255),
     room_id        VARCHAR(255),            -- salle d'appariement créée par la saga
     vs_bot         BOOLEAN      NOT NULL DEFAULT FALSE,
-    status         VARCHAR(20)  NOT NULL,   -- SEARCHING, CLOSED, FAILED
+    status         VARCHAR(20)  NOT NULL,   -- SEARCHING, COMPLETED, CANCELLED, EXPIRED, FAILED
     claimed_by     VARCHAR(255),            -- réservation atomique du pool (le statut reste SEARCHING)
     created_at     TIMESTAMP    NOT NULL,
-    deadline_at    TIMESTAMP    NOT NULL,   -- fin de recherche (repli bot), exposée au client
+    deadline_at    TIMESTAMP    NOT NULL,   -- fin de la fenêtre de recherche (10 s), exposée au client
     updated_at     TIMESTAMP    NOT NULL,
     PRIMARY KEY (matchmaking_id)
 );

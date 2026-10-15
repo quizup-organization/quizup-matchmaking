@@ -8,9 +8,10 @@ import java.time.Duration;
 public interface MatchmakingDeadline {
 
     /**
-     * Recherche d'un adversaire humain avant bascule sur une partie d'**entraînement** (bot).
-     * 10 s : la partie qui suit n'attribue aucune XP, on laisse donc au joueur le temps de
-     * trouver un adversaire réel (c'est la seule voie de progression).
+     * Fenêtre de recherche d'un adversaire humain avant **arrêt** (statut {@code EXPIRED}). Aucun
+     * repli bot automatique : passé le délai, le client propose de relancer une recherche ou de
+     * basculer explicitement sur un entraînement contre un robot (sans XP). L'échéance est aussi
+     * exposée au client ({@code deadlineAt}) pour le compte à rebours et son tic-tac.
      */
     String MATCHMAKING_DEADLINE = "matchmaking-deadline";
 

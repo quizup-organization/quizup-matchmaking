@@ -16,7 +16,9 @@ Trois responsabilités **distinctes**, chacune avec son agrégat :
 
 - **Appariement public** (`MatchmakingAggregate`) : trouve un adversaire pour un sujet
   (même thème, niveau ±5, langues **en union** couvertes par le thème) ; à l'échéance de **10 s**
-  sans adversaire, crée une **salle d'entraînement** (bot) — duel **sans XP** (la progression ne
+  sans adversaire, le ticket **expire** (`EXPIRED`) — **aucun repli bot automatique** : le client
+  propose de relancer une recherche ou de basculer explicitement sur un **entraînement** contre un
+  robot (duel **sans XP**, la progression ne
   vient que des duels entre joueurs, cf. `quizup-profile`). Le matchmaking **ne prépare jamais la
   partie** : il crée
   une salle (nominative ou bot) et marque les tickets. L'agrégat ne conserve que ce dont ses
@@ -48,7 +50,7 @@ Trois responsabilités **distinctes**, chacune avec son agrégat :
 
 ### Cycle de vie (statuts)
 
-- `MatchmakingStatus = SEARCHING | COMPLETED | CANCELLED | FAILED` ;
+- `MatchmakingStatus = SEARCHING | COMPLETED | CANCELLED | EXPIRED | FAILED` ;
   `ChallengeStatus = PENDING | ACCEPTED | DECLINED | CANCELLED | EXPIRED`.
 - `RoomStatus = WAITING_PLAYERS | FETCHING_PLAYERS | FETCHING_PLAYED_QUESTIONS | FETCHING_QUESTIONS |
   CREATING_GAME | GAME_CREATED | COMPLETED | CANCELLED | EXPIRED | FAILED` : le statut suit
@@ -143,8 +145,8 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
 
 ### Appariement public (`MatchmakingSaga`)
 
-- `MatchmakingStartedEvent` → porte `deadlineAt` (fin de recherche, bascule sur
-  l'entraînement) **et la photo de couverture linguistique du sujet**
+- `MatchmakingStartedEvent` → porte `deadlineAt` (fin de la fenêtre de recherche, exposée au
+  client pour le compte à rebours) **et la photo de couverture linguistique du sujet**
   (`TopicLanguageCoverage`, préparée par la façade) ; planifie une deadline **10 s** ;
   **le dernier arrivé** initie le
   pairage : `MatchmakingPoolPort.candidates` (même sujet, niveau ±5, plus anciens), filtre par
@@ -152,8 +154,9 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
   **vérification du thème n°1**, aucune query bloquante), `claim` atomique, puis
   `CreateRoomCommand` (salle nominative, opponentId = candidat) et `MarkMatchmakingMatchedCommand`
   des deux tickets.
-- Deadline atteinte sans adversaire → `CreateRoomCommand(vsBot=true, opponentId = SYSTEM_USER_ID)`
-  (le bot est déjà présent dans la salle créée) + `MarkMatchmakingMatchedCommand(vsBot=true)`.
+- Deadline atteinte sans adversaire → `ExpireMatchmakingCommand` (`EXPIRED`) : **aucune salle**
+  n'est créée. Le client propose alors de relancer une recherche ou de basculer sur un
+  entraînement contre un robot (`POST /api/rooms/bot`).
 - Création de salle **fire-and-forget** (`send`, comme `ChallengeSaga`) : la salle est l'unique
   point d'échec (`RoomFailedEvent` → `ROOM_FAILED`). Les exceptions synchrones des ports (pool) sont
   converties par l'`@ExceptionHandler` de la saga en
@@ -193,7 +196,7 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
 
 - **Appariement** : `POST /api/matchmaking/tickets` (file) ; `GET /{ticketId}` ;
   `POST /{ticketId}/cancel` ; `GET /{ticketId}/notifications` ; WS
-  `/topic/matchmaking/tickets/{ticketId}` (`SEARCHING|MATCHED|CANCELLED|FAILED`) — `MATCHED` porte
+  `/topic/matchmaking/tickets/{ticketId}` (`SEARCHING|MATCHED|CANCELLED|EXPIRED|FAILED`) — `MATCHED` porte
   le `roomId` de la salle créée.
 - **Défis** : `POST /api/challenges { topicId, opponentId, gameId? }` — `gameId` référence la
   **partie terminée d'origine** d'une revanche (validée côté BFF : participation, duel humain,

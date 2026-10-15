@@ -74,6 +74,15 @@ public class MatchmakingProjection {
 
     @EventHandler
     @Transactional
+    public void on(MatchmakingEvent.MatchmakingExpiredEvent event) {
+        update(event.matchmakingId(), matchmaking -> matchmaking.toBuilder()
+                .status(MatchmakingStatus.EXPIRED)
+                .updatedAt(event.expiredAt())
+                .build());
+    }
+
+    @EventHandler
+    @Transactional
     public void on(MatchmakingEvent.MatchmakingPurgedEvent event) {
         repository.deleteById(event.matchmakingId());
     }

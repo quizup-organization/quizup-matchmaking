@@ -90,7 +90,8 @@ class MatchmakingAggregateTest {
     private static MatchmakingEvent.MatchmakingStartedEvent started() {
         java.time.Instant now = java.time.Instant.now();
         return new MatchmakingEvent.MatchmakingStartedEvent(
-                MM_ID, PLAYER, TOPIC, 10, Set.of(Language.FR), COVERAGE, now, now.plusSeconds(5));
+                MM_ID, PLAYER, TOPIC, 10, Set.of(Language.FR), COVERAGE, now,
+                now.plus(java.time.Duration.ofSeconds(10)));
     }
 
     private static MatchmakingEvent.MatchmakingMatchedEvent matched() {

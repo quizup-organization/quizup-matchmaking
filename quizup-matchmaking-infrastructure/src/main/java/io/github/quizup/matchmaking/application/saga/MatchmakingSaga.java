@@ -9,7 +9,6 @@ import io.github.quizup.matchmaking.domain.model.MatchmakingDeadline;
 import io.github.quizup.matchmaking.domain.model.MatchmakingRules;
 import io.github.quizup.matchmaking.domain.model.TopicLanguageCoverage;
 import io.github.quizup.matchmaking.domain.port.out.MatchmakingPoolPort;
-import io.github.quizup.microservice.core.domain.constant.QuizUpConstants;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import lombok.Getter;
 import lombok.Setter;
@@ -37,8 +36,10 @@ import java.util.UUID;
  * <p>
  * Le dernier arrivé initie le pairage : il cherche un candidat plus ancien, compatible (même
  * sujet, niveau ±{@code LEVEL_WINDOW}, langues couvertes par le sujet) puis crée la <b>salle</b>
- * (fire-and-forget, comme le défi nominatif) et marque les deux recherches comme appariées. À
- * l'échéance (5 s) sans adversaire, il crée une salle contre le bot. Le matchmaking ne prépare
+ * (fire-and-forget, comme le défi nominatif) et marque les deux recherches comme appariées.
+ * À l'échéance (**30 s**) sans adversaire, le ticket **s'arrête** ({@code EXPIRED}) — aucun repli
+ * bot automatique : le client propose de relancer une recherche ou de basculer explicitement sur
+ * un entraînement. Le matchmaking ne prépare
  * jamais la partie : la salle est l'unique point d'échec, annoncé aux joueurs présents par
  * {@code RoomSaga}. La couverture linguistique du sujet est portée par
  * {@link MatchmakingEvent.MatchmakingStartedEvent} (photo préparée par la façade) : la saga
@@ -153,12 +154,8 @@ public class MatchmakingSaga {
         if (finished) {
             return;
         }
-        logger.info("Timeout matchmaking — salle bot: matchmakingId={}", matchmakingId);
-        String roomId = UUID.randomUUID().toString();
-        commandGateway.send(new RoomCommand.CreateRoomCommand(
-                roomId, topicId, playerId, QuizUpConstants.SYSTEM_USER_ID, true, null));
-        commandGateway.send(new MatchmakingCommand.MarkMatchmakingMatchedCommand(
-                matchmakingId, null, roomId, true));
+        logger.info("Fenêtre de recherche écoulée sans adversaire: matchmakingId={}", matchmakingId);
+        commandGateway.send(new MatchmakingCommand.ExpireMatchmakingCommand(matchmakingId));
         this.finished = true;
     }
 
@@ -182,6 +179,13 @@ public class MatchmakingSaga {
 
     @SagaEventHandler(associationProperty = "matchmakingId")
     public void on(MatchmakingEvent.MatchmakingCancelledEvent event) {
+        cancelDeadline();
+        schedulePurge();
+        this.finished = true;
+    }
+
+    @SagaEventHandler(associationProperty = "matchmakingId")
+    public void on(MatchmakingEvent.MatchmakingExpiredEvent event) {
         cancelDeadline();
         schedulePurge();
         this.finished = true;

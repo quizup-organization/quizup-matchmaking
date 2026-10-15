@@ -107,6 +107,20 @@ public class MatchmakingAggregate {
         apply(new MatchmakingEvent.MatchmakingFailedEvent(matchmakingId, command.reason(), Instant.now()));
     }
 
+    /**
+     * Commande interne (saga, à l'échéance) : la fenêtre de recherche s'écoule sans adversaire.
+     * Le ticket s'arrête ({@code EXPIRED}) sans créer de salle — le client propose alors de
+     * relancer une recherche ou de basculer sur un entraînement contre un robot.
+     */
+    @CommandHandler
+    public void handle(MatchmakingCommand.ExpireMatchmakingCommand command) {
+        if (status != MatchmakingStatus.SEARCHING) {
+            return;
+        }
+        logger.info("Matchmaking expired without opponent: matchmakingId={}", matchmakingId);
+        apply(new MatchmakingEvent.MatchmakingExpiredEvent(matchmakingId, Instant.now()));
+    }
+
     // ============================ Event Sourcing ============================
 
     // ── Validateurs (requireXxx : nommés, appelés en tête de handler) ──
@@ -139,6 +153,11 @@ public class MatchmakingAggregate {
     @EventSourcingHandler
     public void on(MatchmakingEvent.MatchmakingCancelledEvent event) {
         this.status = MatchmakingStatus.CANCELLED;
+    }
+
+    @EventSourcingHandler
+    public void on(MatchmakingEvent.MatchmakingExpiredEvent event) {
+        this.status = MatchmakingStatus.EXPIRED;
     }
 
     @EventSourcingHandler

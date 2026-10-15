@@ -51,6 +51,12 @@ public interface MatchmakingCommand {
     ) implements MatchmakingCommand {
     }
 
+    /** Commande interne (saga, à l'échéance) : fenêtre de recherche écoulée sans adversaire. */
+    record ExpireMatchmakingCommand(
+            @TargetAggregateIdentifier String matchmakingId
+    ) implements MatchmakingCommand {
+    }
+
     /** Commande interne (saga, après rétention) : purge un état terminal. */
     record PurgeMatchmakingCommand(
             @TargetAggregateIdentifier String matchmakingId

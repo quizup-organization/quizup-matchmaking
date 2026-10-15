@@ -7,7 +7,6 @@ import io.github.quizup.matchmaking.domain.model.MatchmakingCandidate;
 import io.github.quizup.matchmaking.domain.model.MatchmakingDeadline;
 import io.github.quizup.matchmaking.domain.model.TopicLanguageCoverage;
 import io.github.quizup.matchmaking.domain.port.out.MatchmakingPoolPort;
-import io.github.quizup.microservice.core.domain.constant.QuizUpConstants;
 import io.github.quizup.microservice.core.domain.model.i18n.Language;
 import org.axonframework.commandhandling.CommandMessage;
 import org.axonframework.test.matchers.Matchers;
@@ -26,7 +25,7 @@ import static org.mockito.Mockito.when;
 /**
  * Test in-memory de {@link MatchmakingSaga} via {@link SagaTestFixture} : la couverture
  * linguistique est évaluée localement depuis l'événement de démarrage (aucune query bloquante),
- * le repli bot reste déclenché par deadline.
+ * l'échéance de recherche expire le ticket (aucun repli bot).
  */
 class MatchmakingSagaTest {
 
@@ -76,7 +75,7 @@ class MatchmakingSagaTest {
     }
 
     @Test
-    void deadline_withoutCandidate_createsBotRoom() {
+    void deadline_withoutCandidate_expiresTicket() {
         when(pool.candidates(TOPIC, 10, 5, PLAYER, 10)).thenReturn(List.of());
 
         fixture.givenNoPriorActivity()
@@ -84,13 +83,14 @@ class MatchmakingSagaTest {
                 .expectNoDispatchedCommands();
 
         fixture.whenTimeElapses(MatchmakingDeadline.MATCHMAKING_DEADLINE_DURATION)
-                .expectDispatchedCommandsMatching(botRoomMatching());
+                .expectDispatchedCommandsMatching(expireMatching());
     }
 
     private static MatchmakingEvent.MatchmakingStartedEvent started(TopicLanguageCoverage coverage) {
         Instant now = Instant.now();
         return new MatchmakingEvent.MatchmakingStartedEvent(
-                MM_ID, PLAYER, TOPIC, 10, Set.of(Language.FR), coverage, now, now.plusSeconds(5));
+                MM_ID, PLAYER, TOPIC, 10, Set.of(Language.FR), coverage, now,
+                now.plus(MatchmakingDeadline.MATCHMAKING_DEADLINE_DURATION));
     }
 
     private static Matcher<? extends List<? super CommandMessage<?>>> humanMatchMatching() {
@@ -105,14 +105,9 @@ class MatchmakingSagaTest {
                 .count() == 2);
     }
 
-    private static Matcher<? extends List<? super CommandMessage<?>>> botRoomMatching() {
-        return Matchers.matches(commands -> commands.size() == 2
+    private static Matcher<? extends List<? super CommandMessage<?>>> expireMatching() {
+        return Matchers.matches(commands -> commands.size() == 1
                 && commands.stream().anyMatch(command -> command instanceof CommandMessage<?> message
-                        && message.getPayload() instanceof RoomCommand.CreateRoomCommand createRoom
-                        && createRoom.vsBot()
-                        && QuizUpConstants.SYSTEM_USER_ID.equals(createRoom.opponentId()))
-                && commands.stream().anyMatch(command -> command instanceof CommandMessage<?> message
-                        && message.getPayload() instanceof MatchmakingCommand.MarkMatchmakingMatchedCommand mark
-                        && mark.vsBot()));
+                        && message.getPayload() instanceof MatchmakingCommand.ExpireMatchmakingCommand));
     }
 }
