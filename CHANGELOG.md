@@ -1,3 +1,13 @@
+## [11.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v10.4.0...v11.0.0) (2026-10-15)
+
+### ⚠ BREAKING CHANGES
+
+* **matchmaking:** fin de recherche à 10 s (EXPIRED) sans repli bot automatique
+
+### Features
+
+* **matchmaking:** fin de recherche à 10 s (EXPIRED) sans repli bot automatique ([e834d3a](https://github.com/quizup-organization/quizup-matchmaking/commit/e834d3a923e195a3b3c3b7905e771ed8a7fb7d8a))
+
 ## [10.4.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v10.3.1...v10.4.0) (2026-10-14)
 
 ### Features
