@@ -46,7 +46,11 @@ Trois responsabilités **distinctes**, chacune avec son agrégat :
   joueurs présents (`RoomFailedEvent` → `ROOM_FAILED`). Un salon non lancé expire après **1 jour** ;
   tant que la préparation n'est pas engagée, une **sortie explicite est non destructive** (le
   joueur peut revenir) ; dès que les deux sont présents, la sortie est refusée — l'initiateur peut
-  toujours **annuler**.
+  toujours **annuler**. Un joueur présent peut **relancer** (« wizz ») l'autre joueur humain
+  **absent** pour l'inviter à rejoindre la salle : pur temps réel (aucune préparation déclenchée),
+  cadence **10 s par joueur** (`RoomWizzRules`), jamais de cible bot — la relance nourrit la
+  notification personnelle de la cible (`WIZZ`, cf. `quizup-notification`) et le temps réel de la
+  salle (`ROOM_WIZZED`).
 
 ### Cycle de vie (statuts)
 
@@ -102,7 +106,10 @@ requêtes renvoient des `CompletableFuture` dont le callback envoie une commande
 - `RoomCommand` : `CreateRoomCommand` (`vsBot`, `botDifficulty`), `JoinRoomCommand` (apparition,
   + snapshot `RoomPlayer`),
   `LeaveRoomCommand` (refusée après engagement), `CancelRoomCommand` (toujours possible tant que
-  non terminale), `MarkRoomPlayersLoadedCommand`, `MarkRoomPlayedQuestionsLoadedCommand`
+  non terminale), `WizzRoomCommand` (relance d'un adversaire absent — émetteur **présent**,
+  cible **humaine absente**, cadence 10 s par joueur ; refusée sinon, ignorée en préparation
+  engagée/salle terminale),
+  `MarkRoomPlayersLoadedCommand`, `MarkRoomPlayedQuestionsLoadedCommand`
   (+ `Set<String>` des questions jouées), `MarkRoomQuestionsLoadedCommand` (+ `List<DrawnQuestion>`),
   `MarkRoomGameCreatedCommand` (accusé du service game),
   `CompleteRoomCommand`, `FailRoomCommand`, `ExpireRoomCommand`, `PurgeRoomCommand`.
@@ -110,7 +117,8 @@ requêtes renvoient des `CompletableFuture` dont le callback envoie une commande
 - `RoomEvent` : `RoomCreatedEvent` (`vsBot`, `botDifficulty`), `RoomEnteredEvent` (+ snapshot
   `RoomPlayer`, `null` pour le bot), `RoomAllPlayersPresentEvent`, `RoomPlayersLoadedEvent`,
   `RoomPlayedQuestionsLoadedEvent` (+ ids joués), `RoomQuestionsLoadedEvent` (+ `DrawnQuestion`),
-  `RoomGameCreatedEvent`, `RoomLeftEvent`, `RoomCancelledEvent`,
+  `RoomGameCreatedEvent`, `RoomLeftEvent`, `RoomWizzedEvent` (émetteur, cible, instant — pur temps
+  réel, aucun effet de préparation), `RoomCancelledEvent`,
   `RoomCompletedEvent`, `RoomFailedEvent`, `RoomExpiredEvent`, `RoomPurgedEvent`.
 - `MatchmakingQuery`, `ChallengeQuery`, `RoomQuery` (`GetRoomById`, `GetMyOpenRooms`,
   `GetRoomEventsQuery`).
@@ -215,11 +223,12 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
 - **Salles** : `POST /api/rooms { topicId }` (partagée) ; `POST /api/rooms/bot
   { topicId, difficulty? }` (le bot rejoint automatiquement) ; `GET /{roomId}` ;
   `GET /mine` (initiateur **ou** invité) ; `POST /{roomId}/join` (**apparition unique**) ;
-  `POST /{roomId}/leave` (refusée après engagement) | `cancel` (initiateur, toujours possible) ;
+  `POST /{roomId}/leave` (refusée après engagement) | `cancel` (initiateur, toujours possible) |
+  `wizz` (relance de l'adversaire humain absent — pur temps réel, cadence 10 s par joueur) ;
   `GET /{roomId}/notifications` ; WS `/topic/rooms/{roomId}`
-  (`ROOM_CREATED|ROOM_ENTERED|ROOM_ALL_PRESENT|ROOM_PLAYERS_LOADED|ROOM_PLAYED_QUESTIONS_LOADED|ROOM_QUESTIONS_LOADED|ROOM_GAME_CREATED|ROOM_LEFT|ROOM_COMPLETED|ROOM_CANCELLED|ROOM_EXPIRED|ROOM_FAILED`).
+  (`ROOM_CREATED|ROOM_ENTERED|ROOM_ALL_PRESENT|ROOM_PLAYERS_LOADED|ROOM_PLAYED_QUESTIONS_LOADED|ROOM_QUESTIONS_LOADED|ROOM_GAME_CREATED|ROOM_LEFT|ROOM_WIZZED|ROOM_COMPLETED|ROOM_CANCELLED|ROOM_EXPIRED|ROOM_FAILED`).
 - **Notifications personnelles** : consommées par `quizup-notification` depuis le bus Kafka
-  (`CHALLENGE_RECEIVED`, `CHALLENGE_DECLINED`, `ROOM_ACCEPTED`) ; poussées par le BFF sur
+  (`CHALLENGE_RECEIVED`, `CHALLENGE_DECLINED`, `ROOM_ACCEPTED`, `WIZZ`) ; poussées par le BFF sur
   `/topic/notifications/{userId}`.
 - Read models : `matchmaking_entry` (pool + ticket, colonnes `room_id` et `deadline_at`),
   `challenge_entry` (`game_id` = partie d'origine de la revanche, `room_id`),

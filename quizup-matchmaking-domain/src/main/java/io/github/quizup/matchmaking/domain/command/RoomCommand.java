@@ -58,6 +58,19 @@ public interface RoomCommand {
     ) implements RoomCommand {
     }
 
+    /**
+     * Relance (« wizz ») : le joueur <b>présent</b> demande à l'autre joueur humain — absent — de
+     * rejoindre la salle. Pur effet temps réel (aucune préparation déclenchée) ; cadence par
+     * joueur ({@code RoomWizzRules}). Sans cible relançable (salle partagée sans invité, adversaire
+     * déjà présent, bot), la commande est refusée ; une préparation engagée l'ignore (le second
+     * joueur vient d'arriver).
+     */
+    record WizzRoomCommand(
+            @TargetAggregateIdentifier String roomId,
+            String playerId
+    ) implements RoomCommand {
+    }
+
     /** L'initiateur annule explicitement la salle (possible tant que la salle n'est pas terminale). */
     record CancelRoomCommand(
             @TargetAggregateIdentifier String roomId,

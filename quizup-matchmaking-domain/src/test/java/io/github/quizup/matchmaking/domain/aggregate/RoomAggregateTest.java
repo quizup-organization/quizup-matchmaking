@@ -316,6 +316,90 @@ class RoomAggregateTest {
                 .expectException(org.axonframework.modelling.command.AggregateNotFoundException.class);
     }
 
+    @Test
+    void wizz_notifiesAbsentNominalOpponent() {
+        fixture.given(createdWithOpponent(), entered(INITIATOR_PLAYER))
+                .when(new RoomCommand.WizzRoomCommand(ROOM_ID, INITIATOR))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        RoomEvent.RoomWizzedEvent.class,
+                        e -> INITIATOR.equals(((RoomEvent.RoomWizzedEvent) e).playerId())
+                                && OPPONENT.equals(((RoomEvent.RoomWizzedEvent) e).targetId())));
+    }
+
+    @Test
+    void wizz_isSymmetric_earlyGuestNudgesAbsentInitiator() {
+        fixture.given(createdWithOpponent(), entered(OPPONENT_PLAYER))
+                .when(new RoomCommand.WizzRoomCommand(ROOM_ID, OPPONENT))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        RoomEvent.RoomWizzedEvent.class,
+                        e -> OPPONENT.equals(((RoomEvent.RoomWizzedEvent) e).playerId())
+                                && INITIATOR.equals(((RoomEvent.RoomWizzedEvent) e).targetId())));
+    }
+
+    @Test
+    void wizz_refusedWhenRequesterNotPresent() {
+        fixture.given(createdWithOpponent())
+                .when(new RoomCommand.WizzRoomCommand(ROOM_ID, INITIATOR))
+                .expectException(RoomExceptions.RoomWizzRequesterNotPresentProblem.class);
+    }
+
+    @Test
+    void wizz_refusedWithoutNamedOpponent() {
+        fixture.given(created(), entered(INITIATOR_PLAYER))
+                .when(new RoomCommand.WizzRoomCommand(ROOM_ID, INITIATOR))
+                .expectException(RoomExceptions.RoomWizzUnavailableProblem.class);
+    }
+
+    @Test
+    void wizz_refusedToOutsider() {
+        fixture.given(createdWithOpponent(), entered(INITIATOR_PLAYER))
+                .when(new RoomCommand.WizzRoomCommand(ROOM_ID, OTHER))
+                .expectException(RoomExceptions.PlayerNotInRoomProblem.class);
+    }
+
+    @Test
+    void wizz_refusedWithinCooldown() {
+        fixture.given(createdWithOpponent(), entered(INITIATOR_PLAYER),
+                        new RoomEvent.RoomWizzedEvent(ROOM_ID, INITIATOR, OPPONENT, Instant.now()))
+                .when(new RoomCommand.WizzRoomCommand(ROOM_ID, INITIATOR))
+                .expectException(RoomExceptions.RoomWizzCooldownProblem.class);
+    }
+
+    @Test
+    void wizz_allowedOnceCooldownElapsed() {
+        fixture.given(createdWithOpponent(), entered(INITIATOR_PLAYER),
+                        new RoomEvent.RoomWizzedEvent(ROOM_ID, INITIATOR, OPPONENT,
+                                Instant.now().minusSeconds(11)))
+                .when(new RoomCommand.WizzRoomCommand(ROOM_ID, INITIATOR))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        RoomEvent.RoomWizzedEvent.class,
+                        e -> INITIATOR.equals(((RoomEvent.RoomWizzedEvent) e).playerId())));
+    }
+
+    @Test
+    void wizz_ignoredOncePreparationStarted() {
+        fixture.given(createdWithOpponent(), entered(INITIATOR_PLAYER), entered(OPPONENT_PLAYER), allPresent())
+                .when(new RoomCommand.WizzRoomCommand(ROOM_ID, INITIATOR))
+                .expectNoEvents();
+    }
+
+    @Test
+    void wizz_ignoredWhenRoomClosed() {
+        fixture.given(createdWithOpponent(), entered(INITIATOR_PLAYER),
+                        new RoomEvent.RoomCancelledEvent(ROOM_ID, INITIATOR, "PLAYER_CANCELLED", Instant.now()))
+                .when(new RoomCommand.WizzRoomCommand(ROOM_ID, INITIATOR))
+                .expectNoEvents();
+    }
+
+    @Test
+    void wizz_botRoom_neverWizzable() {
+        // Salle bot : le bot est présent dès la création, l'humain qui apparaît engage la
+        // préparation dans la même unité de travail → plus rien à relancer.
+        fixture.given(createdBot(), enteredBot(), entered(INITIATOR_PLAYER), allPresent())
+                .when(new RoomCommand.WizzRoomCommand(ROOM_ID, INITIATOR))
+                .expectNoEvents();
+    }
+
     private static RoomEvent.RoomCreatedEvent created() {
         return new RoomEvent.RoomCreatedEvent(
                 ROOM_ID, TOPIC, INITIATOR, null, false, null,

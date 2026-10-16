@@ -83,4 +83,36 @@ public final class RoomExceptions {
                     "La salle ne peut plus être quittée une fois la préparation de la partie lancée");
         }
     }
+
+    /** La relance exige un joueur réellement présent dans la salle (« connecté en attente »). */
+    public static class RoomWizzRequesterNotPresentProblem extends RoomProblem {
+        public RoomWizzRequesterNotPresentProblem(String roomId, String playerId) {
+            super(roomId, "urn:quizup:room:wizzRequesterNotPresent",
+                    "Joueur non présent",
+                    "Le joueur " + playerId + " doit être présent dans la salle pour relancer son adversaire",
+                    Map.of("playerId", playerId));
+        }
+    }
+
+    /**
+     * Rien à relancer : salle partagée sans invité nommé, adversaire déjà présent ou adversaire
+     * système (bot).
+     */
+    public static class RoomWizzUnavailableProblem extends RoomProblem {
+        public RoomWizzUnavailableProblem(String roomId) {
+            super(roomId, "urn:quizup:room:wizzUnavailable",
+                    "Aucun adversaire à relancer",
+                    "Cette salle n'a pas d'adversaire humain absent à relancer");
+        }
+    }
+
+    /** Cadence anti-spam : un même joueur ne peut pas relancer avant la fin du délai. */
+    public static class RoomWizzCooldownProblem extends RoomProblem {
+        public RoomWizzCooldownProblem(String roomId, String playerId) {
+            super(roomId, "urn:quizup:room:wizzCooldown",
+                    "Relance trop rapide",
+                    "Le joueur " + playerId + " vient déjà de relancer son adversaire",
+                    Map.of("playerId", playerId));
+        }
+    }
 }

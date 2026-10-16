@@ -5,6 +5,7 @@ import io.github.quizup.matchmaking.domain.event.RoomEvent;
 import io.github.quizup.matchmaking.domain.exception.RoomExceptions;
 import io.github.quizup.matchmaking.domain.model.RoomDeadline;
 import io.github.quizup.matchmaking.domain.model.RoomStatus;
+import io.github.quizup.matchmaking.domain.model.RoomWizzRules;
 import io.github.quizup.microservice.core.domain.constant.QuizUpConstants;
 import org.apache.commons.lang3.StringUtils;
 import org.axonframework.commandhandling.CommandHandler;
@@ -15,6 +16,7 @@ import org.axonframework.spring.stereotype.Aggregate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.time.Instant;
 
 import static org.axonframework.modelling.command.AggregateLifecycle.apply;
@@ -44,6 +46,9 @@ public class RoomAggregate {
     private RoomStatus status;
     private boolean initiatorPresent;
     private boolean participantPresent;
+    /** Dernière relance (« wizz ») de chaque joueur : cadence anti-spam, jamais bloquante. */
+    private Instant initiatorWizzedAt;
+    private Instant participantWizzedAt;
 
     protected RoomAggregate() {
     }
@@ -133,6 +138,36 @@ public class RoomAggregate {
             return;
         }
         apply(new RoomEvent.RoomLeftEvent(roomId, command.playerId(), Instant.now()));
+    }
+
+    /**
+     * Relance (« wizz ») : le joueur <b>présent</b> demande à l'autre joueur humain — absent — de
+     * rejoindre la salle. Pur effet temps réel : la préparation n'est pas déclenchée et la
+     * cadence ({@code RoomWizzRules}, 10 s par joueur) borne le harcèlement. Sans cible relançable
+     * (salle partagée sans invité, adversaire déjà présent, bot), la commande est refusée ; une
+     * préparation engagée ou une salle terminale l'ignore (le second joueur vient d'arriver).
+     */
+    @CommandHandler
+    public void handle(RoomCommand.WizzRoomCommand command) {
+        if (isClosed() || status != RoomStatus.WAITING_PLAYERS) {
+            // L'adversaire est là (préparation engagée) ou la salle est close : rien à relancer.
+            return;
+        }
+        requireParticipant(command.playerId());
+        if (!isPresent(command.playerId())) {
+            throw new RoomExceptions.RoomWizzRequesterNotPresentProblem(roomId, command.playerId());
+        }
+        String targetId = wizzableOpponent(command.playerId());
+        if (targetId == null) {
+            throw new RoomExceptions.RoomWizzUnavailableProblem(roomId);
+        }
+        Instant now = Instant.now();
+        if (isWithinWizzCooldown(command.playerId(), now)) {
+            throw new RoomExceptions.RoomWizzCooldownProblem(roomId, command.playerId());
+        }
+        logger.info("Player wizzed room: roomId={}, playerId={}, targetId={}",
+                roomId, command.playerId(), targetId);
+        apply(new RoomEvent.RoomWizzedEvent(roomId, command.playerId(), targetId, now));
     }
 
     /** L'initiateur annule explicitement la salle, y compris pendant la préparation. */
@@ -258,6 +293,36 @@ public class RoomAggregate {
         }
     }
 
+    /** Présence temps réel d'un participant connu (initiateur ou second enregistré). */
+    private boolean isPresent(String playerId) {
+        return playerId.equals(initiatorId) ? initiatorPresent : participantPresent;
+    }
+
+    /**
+     * Adversaire relançable du point de vue du joueur : l'autre humain de la salle, à condition
+     * qu'il soit <b>absent</b> (invité nominatif pas encore apparu, participant sorti non
+     * destructivement). {@code null} quand il n'y a rien à relancer (salle partagée sans invité,
+     * adversaire déjà présent, adversaire système/bot).
+     */
+    private String wizzableOpponent(String playerId) {
+        boolean fromInitiator = playerId.equals(initiatorId);
+        String targetId = fromInitiator
+                ? (participantId != null ? participantId : opponentId)
+                : initiatorId;
+        if (StringUtils.isBlank(targetId) || QuizUpConstants.SYSTEM_USER_ID.equals(targetId)) {
+            return null;
+        }
+        boolean targetPresent = fromInitiator ? participantPresent : initiatorPresent;
+        return targetPresent ? null : targetId;
+    }
+
+    /** Cadence anti-spam : le dernier wizz du joueur n'est pas encore absorbé. */
+    private boolean isWithinWizzCooldown(String playerId, Instant now) {
+        Instant lastWizzedAt = playerId.equals(initiatorId) ? initiatorWizzedAt : participantWizzedAt;
+        return lastWizzedAt != null
+                && Duration.between(lastWizzedAt, now).compareTo(RoomWizzRules.WIZZ_COOLDOWN_DURATION) < 0;
+    }
+
     private boolean bothPresent() {
         return initiatorPresent && participantPresent && StringUtils.isNotBlank(participantId);
     }
@@ -329,6 +394,16 @@ public class RoomAggregate {
             this.initiatorPresent = false;
         } else if (event.playerId().equals(participantId)) {
             this.participantPresent = false;
+        }
+    }
+
+    /** Relance : mémorise l'instant par joueur (cadence anti-spam). */
+    @EventSourcingHandler
+    public void on(RoomEvent.RoomWizzedEvent event) {
+        if (event.playerId().equals(initiatorId)) {
+            this.initiatorWizzedAt = event.wizzedAt();
+        } else {
+            this.participantWizzedAt = event.wizzedAt();
         }
     }
 

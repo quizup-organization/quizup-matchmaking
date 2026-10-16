@@ -102,6 +102,19 @@ public interface RoomEvent {
     ) implements RoomEvent {
     }
 
+    /**
+     * Relance (« wizz ») d'un adversaire absent : {@code playerId} demande à {@code targetId} de
+     * rejoindre la salle. Événement sans effet de préparation — il porte la cadence
+     * (anti-spam par joueur) et alimente le temps réel (push salle, notification cible).
+     */
+    record RoomWizzedEvent(
+            String roomId,
+            String playerId,
+            String targetId,
+            Instant wizzedAt
+    ) implements RoomEvent {
+    }
+
     record RoomCancelledEvent(
             String roomId,
             String initiatorId,
