@@ -1,3 +1,9 @@
+## [11.2.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.1.0...v11.2.0) (2026-10-16)
+
+### Features
+
+* **matchmaking:** relance « wizz » de l'adversaire absent en salle ([f3218f4](https://github.com/quizup-organization/quizup-matchmaking/commit/f3218f484cd973cb449ae5e77a2219a0f4b93a7e))
+
 ## [11.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.0.1...v11.1.0) (2026-10-16)
 
 ### Features
