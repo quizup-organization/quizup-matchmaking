@@ -92,7 +92,13 @@ requêtes renvoient des `CompletableFuture` dont le callback envoie une commande
 - `MatchmakingCommand` : `CreateMatchmakingCommand` (+ `TopicLanguageCoverage` préparée par la
   façade), `CancelMatchmakingCommand`,
   `MarkMatchmakingMatchedCommand` (roomId), `FailMatchmakingCommand`, `PurgeMatchmakingCommand`.
-- `ChallengeCommand` : `CreateChallengeCommand`, `Accept/Decline/Cancel/Expire/Purge`.
+- `ChallengeCommand` : `CreateChallengeCommand`, `Accept/Decline/Cancel/Expire/Purge`, `Start`
+  (commande interne de saga : la partie du défi a été créée).
+- `ChallengeEvent` : `ChallengeCreatedEvent`, `ChallengeAcceptedEvent`, `ChallengeDeclinedEvent`,
+  `ChallengeCancelledEvent`, `ChallengeExpiredEvent`, `ChallengePurgedEvent` et
+  **`ChallengeStartedEvent`** (`challengeId`, `challengerId`, `opponentId`, `gameId`) — le défi
+  **a abouti sur une partie** (distinct de l'acceptation, qui ne garantit pas la présence de
+  l'invité). Consommé par `quizup-profile` (badge **Défis**) ; non exposé par le BFF.
 - `RoomCommand` : `CreateRoomCommand` (`vsBot`, `botDifficulty`), `JoinRoomCommand` (apparition,
   + snapshot `RoomPlayer`),
   `LeaveRoomCommand` (refusée après engagement), `CancelRoomCommand` (toujours possible tant que
@@ -138,7 +144,11 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
   `Expired`) → purge planifiée (rétention **2 min**, `CHALLENGE_PURGE`) ;
   `ChallengePurgedEvent` termine la saga (`markDeleted`).
 - `ChallengeAcceptedEvent` → **création de la salle** `CreateRoomCommand(ChallengeRoomId.of(...))`
-  (one-shot, flag `roomRequested` anti-rejeu). La saga **ne joint personne** : l'apparition est
+  (one-shot, flag `roomRequested` anti-rejeu). La saga **s'associe à cette salle** pour savoir
+  quand le défi **aboutit** : `RoomGameCreatedEvent` de la salle déterministe →
+  `StartChallengeCommand(challengeId, gameId)` → `ChallengeStartedEvent` (consommé par
+  `quizup-profile` pour le badge Défis : **un défi ne compte que s'il a été accepté et a produit
+  une partie**). La saga **ne joint personne** : l'apparition est
   client-driven.
 - `ChallengePurgeSweeper` : balayeur périodique (60 s) filet de sécurité pour les défis terminaux
   plus vieux que rétention + marge (10 min).

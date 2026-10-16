@@ -3,6 +3,7 @@ package io.github.quizup.matchmaking.application.saga;
 import io.github.quizup.matchmaking.domain.command.ChallengeCommand;
 import io.github.quizup.matchmaking.domain.command.RoomCommand;
 import io.github.quizup.matchmaking.domain.event.ChallengeEvent;
+import io.github.quizup.matchmaking.domain.event.RoomEvent;
 import io.github.quizup.matchmaking.domain.model.ChallengeDeadline;
 import io.github.quizup.matchmaking.domain.model.ChallengeRoomId;
 import lombok.Getter;
@@ -13,6 +14,7 @@ import org.axonframework.deadline.DeadlineManager;
 import org.axonframework.deadline.annotation.DeadlineHandler;
 import org.axonframework.modelling.saga.EndSaga;
 import org.axonframework.modelling.saga.SagaEventHandler;
+import org.axonframework.modelling.saga.SagaLifecycle;
 import org.axonframework.modelling.saga.StartSaga;
 import org.axonframework.spring.stereotype.Saga;
 import org.slf4j.Logger;
@@ -22,8 +24,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 /**
  * Orchestration du défi nominatif : expiration après 1 h sans réponse, purge après rétention
  * (2 min) et, à l'acceptation, <b>création de la salle</b> (identifiant déterministe
- * {@link ChallengeRoomId}). La saga ne joint personne et ne touche jamais à la présence :
- * le client seul fait apparaître le joueur dans la salle ({@code JoinRoomCommand}).
+ * {@link ChallengeRoomId}). La saga s'associe ensuite à cette salle pour **acter que le défi a
+ * abouti** dès qu'elle produit une partie (`ChallengeEvent.ChallengeStartedEvent`). La saga ne
+ * joint personne et ne touche jamais à la présence : le client seul fait apparaître le joueur dans
+ * la salle ({@code JoinRoomCommand}).
  */
 @Saga
 @ProcessingGroup("challenge-saga")
@@ -78,9 +82,22 @@ public class ChallengeSaga {
             roomRequested = true;
             String roomId = ChallengeRoomId.of(event.challengeId());
             logger.info("Défi accepté → création de la salle: challengeId={}, roomId={}", challengeId, roomId);
+            // La salle est déterministe : on s'y associe pour savoir **quand le défi aboutit**
+            // (la salle produit la partie — cf. `RoomEvent.RoomGameCreatedEvent`).
+            SagaLifecycle.associateWith("roomId", roomId);
             commandGateway.send(new RoomCommand.CreateRoomCommand(
                     roomId, event.topicId(), event.challengerId(), event.opponentId(), false, null));
         }
+    }
+
+    /**
+     * La salle du défi a produit une partie : le défi « a abouti » (l'invité s'est présenté).
+     * La saga reste vivante (rétention puis purge).
+     */
+    @SagaEventHandler(associationProperty = "roomId")
+    public void on(RoomEvent.RoomGameCreatedEvent event) {
+        logger.info("Défi abouti (partie créée): challengeId={}, gameId={}", challengeId, event.gameId());
+        commandGateway.send(new ChallengeCommand.StartChallengeCommand(challengeId, event.gameId()));
     }
 
     @SagaEventHandler(associationProperty = "challengeId")

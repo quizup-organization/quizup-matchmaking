@@ -124,6 +124,31 @@ class ChallengeAggregateTest {
                 .expectMarkedDeleted();
     }
 
+    @Test
+    void start_afterAcceptance_appliesStarted() {
+        fixture.given(created(), accepted())
+                .when(new ChallengeCommand.StartChallengeCommand(CHALLENGE_ID, "game-1"))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        ChallengeEvent.ChallengeStartedEvent.class,
+                        e -> "game-1".equals(((ChallengeEvent.ChallengeStartedEvent) e).gameId())
+                                && CHALLENGER.equals(((ChallengeEvent.ChallengeStartedEvent) e).challengerId())));
+    }
+
+    @Test
+    void start_twiceIsIdempotent() {
+        fixture.given(created(), accepted(), started())
+                .when(new ChallengeCommand.StartChallengeCommand(CHALLENGE_ID, "game-2"))
+                .expectNoEvents();
+    }
+
+    @Test
+    void start_beforeAcceptanceIsIgnored() {
+        // Fait dérivé de la salle : un défi non accepté ne fait jamais échouer la saga.
+        fixture.given(created())
+                .when(new ChallengeCommand.StartChallengeCommand(CHALLENGE_ID, "game-1"))
+                .expectNoEvents();
+    }
+
     private static ChallengeEvent.ChallengeCreatedEvent created() {
         return new ChallengeEvent.ChallengeCreatedEvent(
                 CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT, null,
@@ -133,5 +158,10 @@ class ChallengeAggregateTest {
     private static ChallengeEvent.ChallengeAcceptedEvent accepted() {
         return new ChallengeEvent.ChallengeAcceptedEvent(
                 CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT, Instant.now());
+    }
+
+    private static ChallengeEvent.ChallengeStartedEvent started() {
+        return new ChallengeEvent.ChallengeStartedEvent(
+                CHALLENGE_ID, CHALLENGER, OPPONENT, "game-1", Instant.now());
     }
 }

@@ -38,6 +38,8 @@ public class ChallengeAggregate {
     private String challengerId;
     private String opponentId;
     private ChallengeStatus status;
+    /** Partie créée par la salle du défi (fait « le défi a abouti »), sinon {@code null}. */
+    private String startedGameId;
 
     protected ChallengeAggregate() {
     }
@@ -108,6 +110,21 @@ public class ChallengeAggregate {
         apply(new ChallengeEvent.ChallengePurgedEvent(challengeId, Instant.now()));
     }
 
+    /**
+     * Commande interne (saga) : la salle du défi a produit une partie — le défi « a abouti ».
+     * Idempotent (une seule partie par défi) et sans échec sur un fait dérivé : un défi qui n'est
+     * pas accepté (ou déjà rattaché à une partie) ignore la commande.
+     */
+    @CommandHandler
+    public void handle(ChallengeCommand.StartChallengeCommand command) {
+        if (startedGameId != null || status != ChallengeStatus.ACCEPTED) {
+            return;
+        }
+        logger.info("Challenge started: challengeId={}, gameId={}", challengeId, command.gameId());
+        apply(new ChallengeEvent.ChallengeStartedEvent(
+                challengeId, challengerId, opponentId, command.gameId(), Instant.now()));
+    }
+
     // ---------------------------------------------------------------------
 
     // ── Validateurs (requireXxx : nommés, appelés en tête de handler) ──
@@ -162,6 +179,11 @@ public class ChallengeAggregate {
     @EventSourcingHandler
     public void on(ChallengeEvent.ChallengeAcceptedEvent event) {
         this.status = ChallengeStatus.ACCEPTED;
+    }
+
+    @EventSourcingHandler
+    public void on(ChallengeEvent.ChallengeStartedEvent event) {
+        this.startedGameId = event.gameId();
     }
 
     @EventSourcingHandler

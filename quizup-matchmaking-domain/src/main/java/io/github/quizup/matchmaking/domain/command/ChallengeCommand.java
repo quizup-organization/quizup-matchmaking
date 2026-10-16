@@ -48,6 +48,16 @@ public interface ChallengeCommand {
     ) implements ChallengeCommand {
     }
 
+    /**
+     * Commande interne (saga) : la **partie du défi a été créée** (salle issue de l'acceptation) —
+     * marque le défi comme ayant abouti sur un duel.
+     */
+    record StartChallengeCommand(
+            @TargetAggregateIdentifier String challengeId,
+            String gameId
+    ) implements ChallengeCommand {
+    }
+
     /** Commande interne (saga, après rétention) : purge un défi terminal. */
     record PurgeChallengeCommand(
             @TargetAggregateIdentifier String challengeId

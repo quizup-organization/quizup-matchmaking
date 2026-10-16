@@ -33,6 +33,20 @@ public interface ChallengeEvent {
     ) implements ChallengeEvent {
     }
 
+    /**
+     * La **partie du défi a été créée** : la salle issue de l'acceptation a produit un duel (les
+     * deux joueurs se sont présentés). C'est le fait « le défi a abouti » — distinct de
+     * l'acceptation, qui ne garantit pas que l'invité vienne jouer.
+     */
+    record ChallengeStartedEvent(
+            String challengeId,
+            String challengerId,
+            String opponentId,
+            String gameId,
+            Instant startedAt
+    ) implements ChallengeEvent {
+    }
+
     record ChallengeDeclinedEvent(
             String challengeId,
             String challengerId,
