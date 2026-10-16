@@ -1,3 +1,9 @@
+## [11.1.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.0.1...v11.1.0) (2026-10-16)
+
+### Features
+
+* **matchmaking:** evenement ChallengeStartedEvent — le defi a abouti sur une partie ([7d3efb0](https://github.com/quizup-organization/quizup-matchmaking/commit/7d3efb04744a556a35dcfa579a9cd575e30d0ee4))
+
 ## [11.0.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.0.0...v11.0.1) (2026-10-15)
 
 ### Bug Fixes
