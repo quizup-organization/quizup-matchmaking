@@ -1,3 +1,9 @@
+## [11.5.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.4.1...v11.5.0) (2026-10-21)
+
+### Features
+
+* **matchmaking:** apparie par Elo et déduit la difficulté du sujet ([6954d1b](https://github.com/quizup-organization/quizup-matchmaking/commit/6954d1bb6b4038b71303d1ff82ecfcd8b06fb909))
+
 ## [11.4.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.4.0...v11.4.1) (2026-10-21)
 
 ### Bug Fixes
