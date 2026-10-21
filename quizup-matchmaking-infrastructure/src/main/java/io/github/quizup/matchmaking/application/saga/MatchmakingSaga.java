@@ -35,7 +35,7 @@ import java.util.UUID;
  * Orchestration de l'appariement public (« Défier le monde »).
  * <p>
  * Le dernier arrivé initie le pairage : il cherche un candidat plus ancien, compatible (même
- * sujet, niveau ±{@code LEVEL_WINDOW}, langues couvertes par le sujet) puis crée la <b>salle</b>
+ * sujet, Elo ±{@code RATING_WINDOW}, langues couvertes par le sujet) puis crée la <b>salle</b>
  * (fire-and-forget, comme le défi nominatif) et marque les deux recherches comme appariées.
  * À l'échéance (**30 s**) sans adversaire, le ticket **s'arrête** ({@code EXPIRED}) — aucun repli
  * bot automatique : le client propose de relancer une recherche ou de basculer explicitement sur
@@ -76,7 +76,7 @@ public class MatchmakingSaga {
 
     @Getter
     @Setter
-    private int level;
+    private int rating;
 
     @Getter
     @Setter
@@ -104,7 +104,7 @@ public class MatchmakingSaga {
         this.matchmakingId = event.matchmakingId();
         this.playerId = event.playerId();
         this.topicId = event.topicId();
-        this.level = event.level();
+        this.rating = event.rating();
         this.topicCoverage = event.topicCoverage();
         this.startedAt = event.startedAt();
 
@@ -118,7 +118,7 @@ public class MatchmakingSaga {
     /** Tente d'apparier avec un candidat plus ancien et compatible (couverture linguistique locale). */
     private void tryMatch(Set<Language> myLanguages) {
         List<MatchmakingCandidate> candidates =
-                pool.candidates(topicId, level, MatchmakingRules.LEVEL_WINDOW, playerId, CANDIDATE_LIMIT);
+                pool.candidates(topicId, rating, MatchmakingRules.RATING_WINDOW, playerId, CANDIDATE_LIMIT);
 
         for (MatchmakingCandidate candidate : candidates) {
             if (!candidate.createdAt().isBefore(startedAt)) {

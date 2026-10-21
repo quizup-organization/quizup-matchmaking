@@ -20,14 +20,14 @@ public interface MatchmakingJpaRepository extends JpaRepository<MatchmakingEntit
               and e.status = io.github.quizup.matchmaking.domain.model.MatchmakingStatus.SEARCHING
               and e.claimedBy is null
               and e.playerId <> :excludePlayerId
-              and e.level between :minLevel and :maxLevel
-            order by abs(e.level - :level) asc, e.createdAt asc
+              and e.rating between :minRating and :maxRating
+            order by abs(e.rating - :rating) asc, e.createdAt asc
             """)
     List<MatchmakingEntity> findCandidates(@Param("topicId") String topicId,
                                            @Param("excludePlayerId") String excludePlayerId,
-                                           @Param("level") int level,
-                                           @Param("minLevel") int minLevel,
-                                           @Param("maxLevel") int maxLevel,
+                                           @Param("rating") int rating,
+                                           @Param("minRating") int minRating,
+                                           @Param("maxRating") int maxRating,
                                            Limit limit);
 
     /**

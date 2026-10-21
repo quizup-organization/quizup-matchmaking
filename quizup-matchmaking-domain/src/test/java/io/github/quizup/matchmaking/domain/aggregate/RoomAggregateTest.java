@@ -35,13 +35,13 @@ class RoomAggregateTest {
     private static final String OTHER = "intruder";
 
     private static final RoomPlayer INITIATOR_PLAYER =
-            new RoomPlayer(INITIATOR, "Alpha", Language.FR, 10, 100);
+            new RoomPlayer(INITIATOR, "Alpha", Language.FR, 10, 100, 0);
     private static final RoomPlayer OPPONENT_PLAYER =
-            new RoomPlayer(OPPONENT, "Bravo", Language.EN, 12, 250);
+            new RoomPlayer(OPPONENT, "Bravo", Language.EN, 12, 250, 0);
     private static final RoomPlayer PARTICIPANT_PLAYER =
-            new RoomPlayer(PARTICIPANT, "Charlie", Language.FR, 8, 50);
+            new RoomPlayer(PARTICIPANT, "Charlie", Language.FR, 8, 50, 0);
     private static final RoomPlayer OTHER_PLAYER =
-            new RoomPlayer(OTHER, "Intruder", Language.FR, 1, 0);
+            new RoomPlayer(OTHER, "Intruder", Language.FR, 1, 0, 0);
 
     private final AggregateTestFixture<RoomAggregate> fixture =
             new AggregateTestFixture<>(RoomAggregate.class);

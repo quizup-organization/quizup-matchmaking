@@ -14,7 +14,7 @@ import java.time.Instant;
 @Getter
 @Entity
 @Table(name = "matchmaking_entry", indexes = {
-        @Index(name = "idx_matchmaking_pool", columnList = "topic_id, status, level, created_at"),
+        @Index(name = "idx_matchmaking_pool", columnList = "topic_id, status, rating, created_at"),
         @Index(name = "idx_matchmaking_player", columnList = "player_id")
 })
 public class MatchmakingEntity {
@@ -29,8 +29,8 @@ public class MatchmakingEntity {
     @Column(name = "topic_id", nullable = false)
     private String topicId;
 
-    @Column(name = "level", nullable = false)
-    private int level;
+    @Column(name = "rating", nullable = false)
+    private int rating;
 
     /** Langues requises, codes ISO 639-1 séparés par des virgules (ex. {@code fr,en}). */
     @Column(name = "languages", nullable = false, length = 64)

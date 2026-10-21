@@ -32,7 +32,7 @@ public class MatchmakingProjection {
                 .matchmakingId(event.matchmakingId())
                 .playerId(event.playerId())
                 .topicId(event.topicId())
-                .level(event.level())
+                .rating(event.rating())
                 .languages(event.languages())
                 .vsBot(false)
                 .status(MatchmakingStatus.SEARCHING)

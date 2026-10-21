@@ -14,7 +14,7 @@ public record Matchmaking(
         String matchmakingId,
         String playerId,
         String topicId,
-        int level,
+        int rating,
         Set<Language> languages,
         String opponentId,
         String roomId,

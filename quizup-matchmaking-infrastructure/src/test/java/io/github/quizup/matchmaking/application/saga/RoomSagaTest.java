@@ -44,9 +44,9 @@ class RoomSagaTest {
     private static final String PARTICIPANT = "player-2";
 
     private static final RoomPlayer INITIATOR_PLAYER =
-            new RoomPlayer(INITIATOR, "Alpha", Language.FR, 10, 100);
+            new RoomPlayer(INITIATOR, "Alpha", Language.FR, 10, 100, 400);
     private static final RoomPlayer PARTICIPANT_PLAYER =
-            new RoomPlayer(PARTICIPANT, "Bravo", Language.EN, 12, 250);
+            new RoomPlayer(PARTICIPANT, "Bravo", Language.EN, 12, 250, 300);
 
     private final PlayedQuestionsPort playedQuestionsPort = Mockito.mock(PlayedQuestionsPort.class);
     private final QuestionDrawPort questionDrawPort = Mockito.mock(QuestionDrawPort.class);
@@ -98,7 +98,7 @@ class RoomSagaTest {
     }
 
     @Test
-    void playedQuestionsLoaded_drawsQuestions_withLevelDerivedPreferences() {
+    void playedQuestionsLoaded_drawsQuestions_withTopicXpDerivedPreferences() {
         DrawnQuestion question = drawnQuestion("q-1");
         when(questionDrawPort.draw(eq(TOPIC), eq(Set.of(Language.FR, Language.EN)),
                 eq(DrawnQuestionDifficulty.MEDIUM), eq(Set.of("q-1"))))

@@ -30,10 +30,10 @@ public class MatchmakingJpaAdapter implements MatchmakingPoolPort, MatchmakingRe
 
     @Override
     @Transactional(readOnly = true)
-    public List<MatchmakingCandidate> candidates(String topicId, int level, int levelWindow,
+    public List<MatchmakingCandidate> candidates(String topicId, int rating, int ratingWindow,
                                                  String excludePlayerId, int limit) {
         return repository
-                .findCandidates(topicId, excludePlayerId, level, level - levelWindow, level + levelWindow, Limit.of(limit))
+                .findCandidates(topicId, excludePlayerId, rating, rating - ratingWindow, rating + ratingWindow, Limit.of(limit))
                 .stream()
                 .filter(entity -> entity.getClaimedBy() == null)
                 .map(MatchmakingEntityMapper::toCandidate)
@@ -58,7 +58,7 @@ public class MatchmakingJpaAdapter implements MatchmakingPoolPort, MatchmakingRe
         entity.setMatchmakingId(matchmaking.matchmakingId());
         entity.setPlayerId(matchmaking.playerId());
         entity.setTopicId(matchmaking.topicId());
-        entity.setLevel(matchmaking.level());
+        entity.setRating(matchmaking.rating());
         entity.setLanguages(MatchmakingEntityMapper.encodeLanguages(matchmaking.languages()));
         entity.setOpponentId(matchmaking.opponentId());
         entity.setRoomId(matchmaking.roomId());

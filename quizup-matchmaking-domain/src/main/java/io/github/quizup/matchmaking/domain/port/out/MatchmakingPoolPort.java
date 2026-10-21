@@ -15,10 +15,10 @@ import java.util.Optional;
 public interface MatchmakingPoolPort {
 
     /**
-     * Candidats compatibles : même sujet, niveau ±{@code levelWindow}, exclusion d'un joueur,
+     * Candidats compatibles : même sujet, Elo ±{@code ratingWindow}, exclusion d'un joueur,
      * non réclamés. Les langues sont filtrées en aval (couverture par le thème).
      */
-    List<MatchmakingCandidate> candidates(String topicId, int level, int levelWindow, String excludePlayerId, int limit);
+    List<MatchmakingCandidate> candidates(String topicId, int rating, int ratingWindow, String excludePlayerId, int limit);
 
     /** Réclame atomiquement une recherche ; vide si elle a déjà été prise. */
     Optional<MatchmakingCandidate> claim(String matchmakingId, String claimedByPlayerId);

@@ -10,6 +10,8 @@ public record RoomPlayer(
         String playerName,
         Language language,
         int level,
-        int xpTotal
+        int xpTotal,
+        /** XP cumulée du joueur dans le sujet de la salle (difficulté des questions). */
+        int topicXp
 ) {
 }

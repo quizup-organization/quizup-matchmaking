@@ -15,7 +15,7 @@
 Trois responsabilités **distinctes**, chacune avec son agrégat :
 
 - **Appariement public** (`MatchmakingAggregate`) : trouve un adversaire pour un sujet
-  (même thème, niveau ±5, langues **en union** couvertes par le thème) ; à l'échéance de **10 s**
+  (même thème, Elo ±400, langues **en union** couvertes par le thème) ; à l'échéance de **10 s**
   sans adversaire, le ticket **expire** (`EXPIRED`) — **aucun repli bot automatique** : le client
   propose de relancer une recherche ou de basculer explicitement sur un **entraînement** contre un
   robot (duel **sans XP**, la progression ne
@@ -23,7 +23,7 @@ Trois responsabilités **distinctes**, chacune avec son agrégat :
   partie** : il crée
   une salle (nominative ou bot) et marque les tickets. L'agrégat ne conserve que ce dont ses
   handlers ont besoin (identifiant, joueur, statut, salle) ; les critères d'appariement (sujet,
-  niveau, langues), la **photo de couverture linguistique du sujet** (`TopicLanguageCoverage`,
+  Elo, langues), la **photo de couverture linguistique du sujet** (`TopicLanguageCoverage`,
   préparée par la façade) et l'issue (adversaire, vsBot) vivent dans les événements (saga + pool
   + BFF).
 - **Défi nominatif** (`ChallengeAggregate`) : intention **asynchrone** « A défie B » (TTL 1 h,
@@ -173,7 +173,7 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
   client pour le compte à rebours) **et la photo de couverture linguistique du sujet**
   (`TopicLanguageCoverage`, préparée par la façade) ; planifie une deadline **10 s** ;
   **le dernier arrivé** initie le
-  pairage : `MatchmakingPoolPort.candidates` (même sujet, niveau ±5, plus anciens), filtre par
+  pairage : `MatchmakingPoolPort.candidates` (même sujet, Elo ±400, plus anciens), filtre par
   langues **local** (`topicCoverage.approvedCountFor(union) >= GameRules.TOTAL_ROUNDS`,
   **vérification du thème n°1**, aucune query bloquante), `claim` atomique, puis
   `CreateRoomCommand` (salle nominative, opponentId = candidat) et `MarkMatchmakingMatchedCommand`
@@ -198,8 +198,8 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
   uniquement, **requête non bloquante**) ; `RoomPlayedQuestionsLoadedEvent` → étape **questions** :
   tirage filtré
   (`QuestionDrawPort`, **requête non bloquante**) avec préférences jamais-jouées + difficulté cible
-  déduite du niveau moyen
-  des joueurs (`QuestionLevelRules` : ≤9 EASY, 10–19 MEDIUM, 20–39 HARD, ≥40 EXPERT) ; chaque étape
+  déduite de la **maîtrise du sujet** moyenne
+  des joueurs (`QuestionLevelRules.targetForTopicXp` : <300 EASY, 300–999 MEDIUM, 1 000–2 499 HARD, ≥2 500 EXPERT) ; chaque étape
   avance le statut de la salle. Chaque callback envoie une commande (`Mark*` portant le résultat,
   ou `FailRoomCommand`) — jamais de mutation de la saga depuis le callback ; timeout d'étape
   (`ROOM_PREPARATION_STEP_TIMEOUT`, 10 s) → `FailRoomCommand("ROOM_PREPARATION_FAILED")`.

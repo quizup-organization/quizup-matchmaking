@@ -45,7 +45,7 @@ public final class MatchmakingEntityMapper {
                 .matchmakingId(entity.getMatchmakingId())
                 .playerId(entity.getPlayerId())
                 .topicId(entity.getTopicId())
-                .level(entity.getLevel())
+                .rating(entity.getRating())
                 .languages(decodeLanguages(entity.getLanguages()))
                 .opponentId(entity.getOpponentId())
                 .roomId(entity.getRoomId())

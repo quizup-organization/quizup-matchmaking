@@ -252,9 +252,9 @@ public class RoomSaga {
         if (drawnQuestions != null || !profilesLoaded()) {
             return;
         }
-        DrawnQuestionDifficulty target = QuestionLevelRules.targetFor(
-                initiatorProfile.level(),
-                participantProfile == null ? null : participantProfile.level());
+        DrawnQuestionDifficulty target = QuestionLevelRules.targetForTopicXp(
+                initiatorProfile.topicXp(),
+                participantProfile == null ? null : participantProfile.topicXp());
         Set<String> excluded = playedQuestionIds == null ? Set.of() : playedQuestionIds;
         String currentRoomId = this.roomId;
         CommandGateway currentGateway = this.commandGateway;

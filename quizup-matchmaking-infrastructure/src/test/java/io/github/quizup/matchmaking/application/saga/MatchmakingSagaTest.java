@@ -55,7 +55,7 @@ class MatchmakingSagaTest {
     void started_withCoveredCandidate_createsRoomAndMarksBothTickets() {
         MatchmakingCandidate candidate = new MatchmakingCandidate(
                 "mm-old", OPPONENT, Set.of(Language.EN), Instant.now().minusSeconds(30));
-        when(pool.candidates(TOPIC, 10, 5, PLAYER, 10)).thenReturn(List.of(candidate));
+        when(pool.candidates(TOPIC, 200, 400, PLAYER, 10)).thenReturn(List.of(candidate));
         when(pool.claim("mm-old", PLAYER)).thenReturn(Optional.of(candidate));
 
         fixture.givenNoPriorActivity()
@@ -67,7 +67,7 @@ class MatchmakingSagaTest {
     void started_withUncoveredLanguageUnion_doesNotMatch() {
         MatchmakingCandidate candidate = new MatchmakingCandidate(
                 "mm-old", OPPONENT, Set.of(Language.EN), Instant.now().minusSeconds(30));
-        when(pool.candidates(TOPIC, 10, 5, PLAYER, 10)).thenReturn(List.of(candidate));
+        when(pool.candidates(TOPIC, 200, 400, PLAYER, 10)).thenReturn(List.of(candidate));
 
         fixture.givenNoPriorActivity()
                 .whenPublishingA(started(PARTIAL_COVERAGE))
@@ -76,7 +76,7 @@ class MatchmakingSagaTest {
 
     @Test
     void deadline_withoutCandidate_expiresTicket() {
-        when(pool.candidates(TOPIC, 10, 5, PLAYER, 10)).thenReturn(List.of());
+        when(pool.candidates(TOPIC, 200, 400, PLAYER, 10)).thenReturn(List.of());
 
         fixture.givenNoPriorActivity()
                 .whenPublishingA(started(FULL_COVERAGE))
@@ -89,7 +89,7 @@ class MatchmakingSagaTest {
     private static MatchmakingEvent.MatchmakingStartedEvent started(TopicLanguageCoverage coverage) {
         Instant now = Instant.now();
         return new MatchmakingEvent.MatchmakingStartedEvent(
-                MM_ID, PLAYER, TOPIC, 10, Set.of(Language.FR), coverage, now,
+                MM_ID, PLAYER, TOPIC, 200, Set.of(Language.FR), coverage, now,
                 now.plus(MatchmakingDeadline.MATCHMAKING_DEADLINE_DURATION));
     }
 

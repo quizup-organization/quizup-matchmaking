@@ -15,7 +15,7 @@ public interface MatchmakingEvent {
             String matchmakingId,
             String playerId,
             String topicId,
-            int level,
+            int rating,
             Set<Language> languages,
             TopicLanguageCoverage topicCoverage,
             Instant startedAt,

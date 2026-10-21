@@ -21,10 +21,10 @@ import static org.axonframework.modelling.command.AggregateLifecycle.apply;
 /**
  * MatchmakingAggregate — recherche d'un adversaire pour un duel public (« Défier le monde »).
  * <p>
- * File d'appariement pure : la saga associe deux recherches compatibles (même sujet, niveau ±5,
+ * File d'appariement pure : la saga associe deux recherches compatibles (même sujet, Elo proche,
  * langues couvertes par le sujet) et crée une <b>salle</b> ; elle ne prépare ni ne crée jamais la
  * partie (c'est le rôle de la salle). L'agrégat ne conserve que ce dont ses handlers ont besoin
- * (identifiant, joueur, statut, salle) : les critères d'appariement (sujet, niveau, langues) et
+ * (identifiant, joueur, statut, salle) : les critères d'appariement (sujet, Elo, langues) et
  * l'issue (adversaire, vsBot) vivent dans les événements, consommés par la saga et le read model.
  */
 @Aggregate
@@ -45,14 +45,14 @@ public class MatchmakingAggregate {
     public MatchmakingAggregate(MatchmakingCommand.CreateMatchmakingCommand command) {
         requirePlayerId(command.playerId(), command.matchmakingId());
         requireTopicId(command.topicId(), command.matchmakingId());
-        logger.info("Starting matchmaking: matchmakingId={}, playerId={}, topicId={}, level={}",
-                command.matchmakingId(), command.playerId(), command.topicId(), command.level());
+        logger.info("Starting matchmaking: matchmakingId={}, playerId={}, topicId={}, rating={}",
+                command.matchmakingId(), command.playerId(), command.topicId(), command.rating());
         Instant now = Instant.now();
         apply(new MatchmakingEvent.MatchmakingStartedEvent(
                 command.matchmakingId(),
                 command.playerId(),
                 command.topicId(),
-                command.level(),
+                command.rating(),
                 command.languages(),
                 command.topicCoverage(),
                 now,
