@@ -1,3 +1,9 @@
+## [11.4.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.4.0...v11.4.1) (2026-10-21)
+
+### Bug Fixes
+
+* **matchmaking:** aligne les contrats sur les dernières releases ([44d4f41](https://github.com/quizup-organization/quizup-matchmaking/commit/44d4f417587ca376661d0ae7fd6047f933252beb))
+
 ## [11.4.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.3.0...v11.4.0) (2026-10-21)
 
 ### Features
