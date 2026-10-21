@@ -1,3 +1,9 @@
+## [11.3.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.2.0...v11.3.0) (2026-10-21)
+
+### Features
+
+* **matchmaking:** limite les demandes de revanche à 5 secondes ([f2849a5](https://github.com/quizup-organization/quizup-matchmaking/commit/f2849a5e7334f010fecf5cad31b011417ae9e726))
+
 ## [11.2.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.1.0...v11.2.0) (2026-10-16)
 
 ### Features
