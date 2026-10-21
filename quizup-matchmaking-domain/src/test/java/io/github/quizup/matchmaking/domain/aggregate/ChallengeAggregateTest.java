@@ -7,6 +7,7 @@ import io.github.quizup.matchmaking.domain.exception.ChallengeExceptions;
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -42,6 +43,36 @@ class ChallengeAggregateTest {
                 .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
                         ChallengeEvent.ChallengeCreatedEvent.class,
                         e -> "game-1".equals(((ChallengeEvent.ChallengeCreatedEvent) e).gameId())));
+    }
+
+    @Test
+    void create_rematchExpiresAfterFiveSeconds() {
+        Instant before = Instant.now();
+        fixture.givenNoPriorActivity()
+                .when(new ChallengeCommand.CreateChallengeCommand(CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT, "game-1"))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        ChallengeEvent.ChallengeCreatedEvent.class,
+                        e -> isExpiryBetween(
+                                ((ChallengeEvent.ChallengeCreatedEvent) e).expiresAt(),
+                                before.plusSeconds(4),
+                                before.plusSeconds(7))));
+    }
+
+    @Test
+    void create_normalChallengeKeepsOneHourExpiry() {
+        Instant before = Instant.now();
+        fixture.givenNoPriorActivity()
+                .when(new ChallengeCommand.CreateChallengeCommand(CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT, null))
+                .expectEventsMatching(QuizUpAxonMatchers.singlePayloadMatching(
+                        ChallengeEvent.ChallengeCreatedEvent.class,
+                        e -> isExpiryBetween(
+                                ((ChallengeEvent.ChallengeCreatedEvent) e).expiresAt(),
+                                before.plus(Duration.ofMinutes(59)),
+                                before.plus(Duration.ofMinutes(61)))));
+    }
+
+    private static boolean isExpiryBetween(Instant expiry, Instant min, Instant max) {
+        return !expiry.isBefore(min) && !expiry.isAfter(max);
     }
 
     @Test

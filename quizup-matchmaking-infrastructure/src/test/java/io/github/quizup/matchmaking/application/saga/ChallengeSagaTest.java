@@ -7,6 +7,7 @@ import io.github.quizup.matchmaking.domain.model.ChallengeRoomId;
 import org.axonframework.test.saga.SagaTestFixture;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -35,6 +36,20 @@ class ChallengeSagaTest {
                 // badge Défis du lanceur (cf. `ChallengeBadgesSaga`).
                 .expectDispatchedCommands(
                         new ChallengeCommand.StartChallengeCommand(CHALLENGE_ID, GAME_ID));
+    }
+
+    @Test
+    void rematchExpiresAtTheDeadlineCarriedByTheEvent() {
+        Instant now = fixture.currentTime();
+        ChallengeEvent.ChallengeCreatedEvent rematch =
+                new ChallengeEvent.ChallengeCreatedEvent(
+                        CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT, GAME_ID,
+                        now.plusSeconds(5), now);
+
+        fixture.givenAPublished(rematch)
+                .whenTimeElapses(Duration.ofSeconds(5))
+                .expectDispatchedCommands(
+                        new ChallengeCommand.ExpireChallengeCommand(CHALLENGE_ID));
     }
 
     @Test

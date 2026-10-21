@@ -60,7 +60,7 @@ public class ChallengeAggregate {
                 command.challengerId(),
                 command.opponentId(),
                 command.gameId(),
-                Instant.now().plus(ChallengeDeadline.CHALLENGE_EXPIRY_DURATION),
+                Instant.now().plus(ChallengeDeadline.expiryFor(command.gameId() != null)),
                 Instant.now()));
     }
 

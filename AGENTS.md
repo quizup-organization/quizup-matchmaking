@@ -27,6 +27,7 @@ Trois responsabilités **distinctes**, chacune avec son agrégat :
   préparée par la façade) et l'issue (adversaire, vsBot) vivent dans les événements (saga + pool
   + BFF).
 - **Défi nominatif** (`ChallengeAggregate`) : intention **asynchrone** « A défie B » (TTL 1 h,
+  **5 s pour une revanche** — défi portant le `gameId` d'une partie terminée,
   accept/refuse/annule/expire), sans présence ni partie et **sans validation de faisabilité**
   (couverture linguistique, questions) : l'agrégat se limite aux invariants de la commande
   (identifiants, pas d'auto-défi, statut). À l'acceptation, `ChallengeSaga` crée la salle ; le lien
@@ -148,8 +149,10 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
 
 ### Défi nominatif (`ChallengeSaga`)
 
-- `ChallengeCreatedEvent` → expiration **1 h** ; chaque terminal (`Accepted`, `Declined`, `Cancelled`,
-  `Expired`) → purge planifiée (rétention **2 min**, `CHALLENGE_PURGE`) ;
+- `ChallengeCreatedEvent` → expiration à l'échéance **portée par l'événement** (`expiresAt` :
+  1 h, ou **5 s** pour une revanche) — la saga ne recalcule jamais la durée ; chaque terminal
+  (`Accepted`, `Declined`, `Cancelled`, `Expired`) → purge planifiée (rétention **2 min**,
+  `CHALLENGE_PURGE`) ;
   `ChallengePurgedEvent` termine la saga (`markDeleted`).
 - `ChallengeAcceptedEvent` → **création de la salle** `CreateRoomCommand(ChallengeRoomId.of(...))`
   (one-shot, flag `roomRequested` anti-rejeu). La saga **s'associe à cette salle** pour savoir
@@ -217,7 +220,8 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
   `/topic/matchmaking/tickets/{ticketId}` (`SEARCHING|MATCHED|CANCELLED|EXPIRED|FAILED`) — `MATCHED` porte
   le `roomId` de la salle créée.
 - **Défis** : `POST /api/challenges { topicId, opponentId, gameId? }` — `gameId` référence la
-  **partie terminée d'origine** d'une revanche (validée côté BFF : participation, duel humain,
+  **partie terminée d'origine** d'une revanche, à **TTL court (5 s)** (validée côté BFF :
+  participation, duel humain,
   adversaire) ; `GET /{challengeId}` / `GET /mine` exposent `ChallengeView.gameId` ;
   `POST /{id}/accept|decline|cancel` — `ChallengeView.roomId` dès l'acceptation (dérivé, déterministe).
 - **Salles** : `POST /api/rooms { topicId }` (partagée) ; `POST /api/rooms/bot
