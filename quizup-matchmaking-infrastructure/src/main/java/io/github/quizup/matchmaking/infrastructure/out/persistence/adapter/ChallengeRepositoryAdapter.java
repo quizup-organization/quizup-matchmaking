@@ -37,7 +37,7 @@ public class ChallengeRepositoryAdapter implements ChallengeRepositoryPort {
     @Transactional(readOnly = true)
     public List<Challenge> findPendingByPlayerId(String playerId) {
         return challengeJpaRepository
-                .findPendingByPlayerId(ChallengeStatus.PENDING, playerId)
+                .findPendingByPlayerId(ChallengeStatus.PENDING, playerId, Instant.now())
                 .stream()
                 .map(ChallengeEntityMapper::toDomain)
                 .toList();

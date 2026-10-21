@@ -46,7 +46,7 @@ class ChallengeAggregateTest {
     }
 
     @Test
-    void create_rematchExpiresAfterFiveSeconds() {
+    void create_rematchExpiresAfterTenSeconds() {
         Instant before = Instant.now();
         fixture.givenNoPriorActivity()
                 .when(new ChallengeCommand.CreateChallengeCommand(CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT, "game-1"))
@@ -54,8 +54,8 @@ class ChallengeAggregateTest {
                         ChallengeEvent.ChallengeCreatedEvent.class,
                         e -> isExpiryBetween(
                                 ((ChallengeEvent.ChallengeCreatedEvent) e).expiresAt(),
-                                before.plusSeconds(4),
-                                before.plusSeconds(7))));
+                                before.plusSeconds(9),
+                                before.plusSeconds(12))));
     }
 
     @Test

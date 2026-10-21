@@ -25,7 +25,7 @@ import java.time.Duration;
 
 /**
  * Orchestration du défi nominatif : expiration à l'échéance portée par l'événement de création
- * (1 h pour un défi, 5 s pour une revanche), purge après rétention (2 min) et, à l'acceptation,
+ * (1 h pour un défi, 10 s pour une revanche), purge après rétention (2 min) et, à l'acceptation,
  * <b>création de la salle</b> (identifiant déterministe {@link ChallengeRoomId}). La saga s'associe
  * ensuite à cette salle pour **acter que le défi a abouti** dès qu'elle produit une partie
  * ({@code ChallengeEvent.ChallengeStartedEvent}). La saga ne joint personne et ne touche jamais à la
@@ -63,7 +63,7 @@ public class ChallengeSaga {
     @SagaEventHandler(associationProperty = "challengeId")
     public void on(ChallengeEvent.ChallengeCreatedEvent event) {
         this.challengeId = event.challengeId();
-        // L'agrégat porte l'échéance absolue (1 h, ou 5 s pour une revanche) : la saga planifie
+        // L'agrégat porte l'échéance absolue (1 h, ou 10 s pour une revanche) : la saga planifie
         // exactement cet instant, jamais une durée recalculée depuis son propre horloge — sinon
         // la notification et l'agrégat expireraient à des moments différents.
         Duration ttl = Duration.between(event.createdAt(), event.expiresAt());

@@ -63,6 +63,13 @@ class ChallengeProjectionTest {
     }
 
     @Test
+    void expired_deletesChallengeImmediately() {
+        projection.on(new ChallengeEvent.ChallengeExpiredEvent("challenge-1", AT));
+
+        verify(repository).deleteById("challenge-1");
+    }
+
+    @Test
     void purged_deletesChallenge() {
         projection.on(new ChallengeEvent.ChallengePurgedEvent("challenge-1", AT));
 

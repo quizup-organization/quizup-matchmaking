@@ -68,13 +68,15 @@ public class ChallengeProjection {
                 .build());
     }
 
+    /**
+     * Un défi expiré disparaît **immédiatement** de la section Défis : la ligne est supprimée du
+     * read model (les lectures tardives répondent 404). La purge de l'agrégat reste portée par la
+     * saga (rétention interne, non exposée).
+     */
     @EventHandler
     @Transactional
     public void on(ChallengeEvent.ChallengeExpiredEvent event) {
-        update(event.challengeId(), challenge -> challenge.toBuilder()
-                .status(ChallengeStatus.EXPIRED)
-                .resolvedAt(event.expiredAt())
-                .build());
+        challengeRepositoryPort.deleteById(event.challengeId());
     }
 
     @EventHandler

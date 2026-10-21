@@ -44,10 +44,10 @@ class ChallengeSagaTest {
         ChallengeEvent.ChallengeCreatedEvent rematch =
                 new ChallengeEvent.ChallengeCreatedEvent(
                         CHALLENGE_ID, TOPIC, CHALLENGER, OPPONENT, GAME_ID,
-                        now.plusSeconds(5), now);
+                        now.plusSeconds(10), now);
 
         fixture.givenAPublished(rematch)
-                .whenTimeElapses(Duration.ofSeconds(5))
+                .whenTimeElapses(Duration.ofSeconds(10))
                 .expectDispatchedCommands(
                         new ChallengeCommand.ExpireChallengeCommand(CHALLENGE_ID));
     }

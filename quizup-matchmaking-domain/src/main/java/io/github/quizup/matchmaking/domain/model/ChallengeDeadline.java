@@ -17,7 +17,7 @@ public interface ChallengeDeadline {
      * Durée d'une demande de revanche (défi portant le {@code gameId} d'une partie terminée) :
      * très courte, car le lanceur attend sur le bouton « Revanche » de l'écran de résultat.
      */
-    Duration REMATCH_EXPIRY_DURATION = Duration.ofSeconds(5);
+    Duration REMATCH_EXPIRY_DURATION = Duration.ofSeconds(10);
 
     /** Durée d'expiration selon la nature du défi. */
     static Duration expiryFor(boolean rematch) {

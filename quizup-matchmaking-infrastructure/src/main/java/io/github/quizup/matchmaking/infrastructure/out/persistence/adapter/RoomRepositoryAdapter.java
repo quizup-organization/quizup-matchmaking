@@ -8,6 +8,7 @@ import io.github.quizup.matchmaking.infrastructure.out.persistence.repository.Ro
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,7 +37,7 @@ public class RoomRepositoryAdapter implements RoomRepositoryPort {
     @Transactional(readOnly = true)
     public List<Room> findWaitingByPlayerId(String playerId) {
         return roomJpaRepository
-                .findByStatusAndPlayerId(RoomStatus.WAITING_PLAYERS, playerId)
+                .findByStatusAndPlayerId(RoomStatus.WAITING_PLAYERS, playerId, Instant.now())
                 .stream()
                 .map(RoomEntityMapper::toDomain)
                 .toList();

@@ -16,11 +16,13 @@ public interface ChallengeJpaRepository extends JpaRepository<ChallengeEntity, S
     @Query("""
             select c from ChallengeEntity c
             where c.status = :status
+              and c.expiresAt > :now
               and (c.challengerId = :playerId or c.opponentId = :playerId)
             order by c.createdAt desc
             """)
     List<ChallengeEntity> findPendingByPlayerId(@Param("status") ChallengeStatus status,
-                                                @Param("playerId") String playerId);
+                                                @Param("playerId") String playerId,
+                                                @Param("now") Instant now);
 
     @Query("""
             select c.challengeId from ChallengeEntity c

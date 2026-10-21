@@ -27,7 +27,7 @@ Trois responsabilités **distinctes**, chacune avec son agrégat :
   préparée par la façade) et l'issue (adversaire, vsBot) vivent dans les événements (saga + pool
   + BFF).
 - **Défi nominatif** (`ChallengeAggregate`) : intention **asynchrone** « A défie B » (TTL 1 h,
-  **5 s pour une revanche** — défi portant le `gameId` d'une partie terminée,
+  **10 s pour une revanche** — défi portant le `gameId` d'une partie terminée,
   accept/refuse/annule/expire), sans présence ni partie et **sans validation de faisabilité**
   (couverture linguistique, questions) : l'agrégat se limite aux invariants de la commande
   (identifiants, pas d'auto-défi, statut). À l'acceptation, `ChallengeSaga` crée la salle ; le lien
@@ -150,10 +150,13 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
 ### Défi nominatif (`ChallengeSaga`)
 
 - `ChallengeCreatedEvent` → expiration à l'échéance **portée par l'événement** (`expiresAt` :
-  1 h, ou **5 s** pour une revanche) — la saga ne recalcule jamais la durée ; chaque terminal
+  1 h, ou **10 s** pour une revanche) — la saga ne recalcule jamais la durée ; chaque terminal
   (`Accepted`, `Declined`, `Cancelled`, `Expired`) → purge planifiée (rétention **2 min**,
   `CHALLENGE_PURGE`) ;
   `ChallengePurgedEvent` termine la saga (`markDeleted`).
+- Un défi **expiré** est supprimé **immédiatement** du read model par `ChallengeProjection`
+  (lectures tardives `404`) ; les listes actives filtrent aussi `expiresAt > now`. La purge de
+  l'agrégat garde sa rétention interne de 2 min (non exposée).
 - `ChallengeAcceptedEvent` → **création de la salle** `CreateRoomCommand(ChallengeRoomId.of(...))`
   (one-shot, flag `roomRequested` anti-rejeu). La saga **s'associe à cette salle** pour savoir
   quand le défi **aboutit** : `RoomGameCreatedEvent` de la salle déterministe →
@@ -220,7 +223,7 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
   `/topic/matchmaking/tickets/{ticketId}` (`SEARCHING|MATCHED|CANCELLED|EXPIRED|FAILED`) — `MATCHED` porte
   le `roomId` de la salle créée.
 - **Défis** : `POST /api/challenges { topicId, opponentId, gameId? }` — `gameId` référence la
-  **partie terminée d'origine** d'une revanche, à **TTL court (5 s)** (validée côté BFF :
+  **partie terminée d'origine** d'une revanche, à **TTL court (10 s)** (validée côté BFF :
   participation, duel humain,
   adversaire) ; `GET /{challengeId}` / `GET /mine` exposent `ChallengeView.gameId` ;
   `POST /{id}/accept|decline|cancel` — `ChallengeView.roomId` dès l'acceptation (dérivé, déterministe).
@@ -237,6 +240,7 @@ la traduction vers `game.GameQuestion` est faite par la saga émettrice elle-mê
 - Read models : `matchmaking_entry` (pool + ticket, colonnes `room_id` et `deadline_at`),
   `challenge_entry` (`game_id` = partie d'origine de la revanche, `room_id`),
   `room_entry` (`vs_bot`, avancement). L'agrégat reste la source de vérité ; le pool est
-  reconstructible à partir des `MatchmakingStartedEvent`.
+  reconstructible à partir des `MatchmakingStartedEvent`. Les queries de listes actives
+  (`GetMyChallenges`, `GetMyOpenRooms`) excluent les échéances dépassées.
 - **Data prod** : les breaking changes des contrats sont accompagnés d'un **reset** de la data
   (schéma recréé, pas de migration de compatibilité).
