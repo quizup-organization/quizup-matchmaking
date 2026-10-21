@@ -1,3 +1,9 @@
+## [11.4.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.3.0...v11.4.0) (2026-10-21)
+
+### Features
+
+* **matchmaking:** purge immédiate et TTL revanche à 10 s ([8aca2ed](https://github.com/quizup-organization/quizup-matchmaking/commit/8aca2edacb96681f3577bafb3eb891af73873599))
+
 ## [11.3.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.2.0...v11.3.0) (2026-10-21)
 
 ### Features
