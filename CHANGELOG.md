@@ -1,3 +1,9 @@
+## [11.6.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.6.0...v11.6.1) (2026-10-22)
+
+### Bug Fixes
+
+* **matchmaking:** porte l'Elo du joueur dans le snapshot de salle ([bf01a60](https://github.com/quizup-organization/quizup-matchmaking/commit/bf01a608870f44534abe59c4fedc51249b6b1607))
+
 ## [11.6.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.5.0...v11.6.0) (2026-10-22)
 
 ### Features
