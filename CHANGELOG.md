@@ -1,3 +1,9 @@
+## [11.6.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.5.0...v11.6.0) (2026-10-22)
+
+### Features
+
+* **account:** annule les salles et défis du compte supprimé ([9fa239d](https://github.com/quizup-organization/quizup-matchmaking/commit/9fa239d917aa80ff9362b1ad4459e5e692acfcf6))
+
 ## [11.5.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.4.1...v11.5.0) (2026-10-21)
 
 ### Features
