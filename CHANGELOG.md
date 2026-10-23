@@ -1,3 +1,13 @@
+## [12.0.0](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.6.1...v12.0.0) (2026-10-23)
+
+### ⚠ BREAKING CHANGES
+
+* **matchmaking:** retire niveau et XP globale de RoomPlayer
+
+### Code Refactoring
+
+* **matchmaking:** retire niveau et XP globale de RoomPlayer ([31a30bd](https://github.com/quizup-organization/quizup-matchmaking/commit/31a30bd72dd82d0704b40956955e28b25c466c50))
+
 ## [11.6.1](https://github.com/quizup-organization/quizup-matchmaking/compare/v11.6.0...v11.6.1) (2026-10-22)
 
 ### Bug Fixes
