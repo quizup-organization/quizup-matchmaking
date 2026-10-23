@@ -45,10 +45,10 @@ public class GamePreparationService {
                 vsBot ? QuizUpConstants.SYSTEM_USER_NAME : participant.playerName(),
                 vsBot ? GamePlayerType.BOT : GamePlayerType.HUMAN,
                 difficulty,
-                new PlayerProgressSnapshot(initiator.level(), initiator.xpTotal(), initiator.rating()),
+                new PlayerProgressSnapshot(initiator.rating()),
                 vsBot
-                        ? PlayerProgressSnapshot.forBot(difficulty)
-                        : new PlayerProgressSnapshot(participant.level(), participant.xpTotal(), participant.rating()),
+                        ? PlayerProgressSnapshot.forBot()
+                        : new PlayerProgressSnapshot(participant.rating()),
                 toGameQuestions(questions));
     }
 

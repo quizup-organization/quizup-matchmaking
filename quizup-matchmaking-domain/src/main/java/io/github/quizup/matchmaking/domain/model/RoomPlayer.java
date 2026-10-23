@@ -9,17 +9,9 @@ public record RoomPlayer(
         String playerId,
         String playerName,
         Language language,
-        int level,
-        int xpTotal,
         /** XP cumulée du joueur dans le sujet de la salle (difficulté des questions). */
         int topicXp,
         /** Elo au moment de l'entrée en salle (snapshot porté par la partie). */
         Integer rating
 ) {
-
-    /** Compatibilité avec les snapshots historiques sans Elo. */
-    public RoomPlayer(String playerId, String playerName, Language language,
-                      int level, int xpTotal, int topicXp) {
-        this(playerId, playerName, language, level, xpTotal, topicXp, null);
-    }
 }

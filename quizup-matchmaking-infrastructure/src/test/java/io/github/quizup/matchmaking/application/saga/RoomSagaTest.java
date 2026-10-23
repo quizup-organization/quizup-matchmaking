@@ -44,9 +44,9 @@ class RoomSagaTest {
     private static final String PARTICIPANT = "player-2";
 
     private static final RoomPlayer INITIATOR_PLAYER =
-            new RoomPlayer(INITIATOR, "Alpha", Language.FR, 10, 100, 400);
+            new RoomPlayer(INITIATOR, "Alpha", Language.FR, 400, 200);
     private static final RoomPlayer PARTICIPANT_PLAYER =
-            new RoomPlayer(PARTICIPANT, "Bravo", Language.EN, 12, 250, 300);
+            new RoomPlayer(PARTICIPANT, "Bravo", Language.EN, 300, 200);
 
     private final PlayedQuestionsPort playedQuestionsPort = Mockito.mock(PlayedQuestionsPort.class);
     private final QuestionDrawPort questionDrawPort = Mockito.mock(QuestionDrawPort.class);
